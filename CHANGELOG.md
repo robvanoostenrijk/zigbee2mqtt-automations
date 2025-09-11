@@ -21,9 +21,9 @@ If you like this project and find it useful, please consider giving it a star on
 
 ### Changed
 
-- [package]: Update dependencies.
-- [package]: Update package.json.
-- [package]: Update tsconfig.json.
+- [package]: Updated dependencies.
+- [package]: Updated package.json.
+- [package]: Updated tsconfig.json.
 
 <a href="https://www.buymeacoffee.com/luligugithub">
   <img src="bmc-button.svg" alt="Buy me a coffee" width="80">
