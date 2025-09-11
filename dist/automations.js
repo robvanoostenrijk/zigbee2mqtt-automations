@@ -21,17 +21,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* eslint-disable jsdoc/require-jsdoc */
-/* eslint-disable jsdoc/require-param-type */
-/* eslint-disable jsdoc/require-param-description */
-/* eslint-disable jsdoc/require-returns */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-dynamic-delete */
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 /* eslint-disable @typescript-eslint/no-require-imports */
-/* eslint-disable import/no-duplicates */
-/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable no-console */
+/* eslint-disable jsdoc/require-jsdoc */
+/* eslint-disable jsdoc/require-param-type */
+/* eslint-disable jsdoc/require-param-description */
+/* eslint-disable jsdoc/require-returns */
+/* eslint-disable import/no-duplicates */
 const node_buffer_1 = require("node:buffer");
 // These packages are defined inside zigbee2mqtt and so they are not available here to import!
 // The external extensions are now loaded from a temp directory, we use require to load them from where we know they are

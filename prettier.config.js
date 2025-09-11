@@ -2,7 +2,7 @@
 
 // Config for Prettier
 
-export default {
+module.exports = {
   printWidth: 180, // default 80
   tabWidth: 2,
   useTabs: false,

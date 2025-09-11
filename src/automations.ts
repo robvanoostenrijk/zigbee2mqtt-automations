@@ -1039,7 +1039,6 @@ class AutomationsExtension {
   // Publish: topic "zigbee2mqtt-scenes/<scene_name>" with raw message "execute"
   private processMessage(message: MQTTMessage) {
     const automationsMatch = message.topic.match(this.automationsTopicRegex);
-
     if (automationsMatch) {
       for (const automations of Object.values(this.eventAutomations)) {
         for (const automation of automations) {
@@ -1060,7 +1059,6 @@ class AutomationsExtension {
     }
 
     const scenesMatch = message.topic.match(this.scenesTopicRegex);
-
     if (scenesMatch) {
       Object.entries(this.scenes).forEach(([key]) => {
         if (key == scenesMatch[1]) {

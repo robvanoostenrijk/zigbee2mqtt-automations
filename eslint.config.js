@@ -2,19 +2,18 @@
 
 // This ESLint configuration is designed for a TypeScript project.
 
-import { defineConfig } from 'eslint/config';
-import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import pluginImport from 'eslint-plugin-import';
-import pluginN from 'eslint-plugin-n';
-import pluginPromise from 'eslint-plugin-promise';
-import pluginJsdoc from 'eslint-plugin-jsdoc';
-import pluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+const js = require('@eslint/js');
+const tseslint = require('typescript-eslint');
+const pluginImport = require('eslint-plugin-import');
+const pluginN = require('eslint-plugin-n');
+const pluginPromise = require('eslint-plugin-promise');
+const pluginJsdoc = require('eslint-plugin-jsdoc');
+const pluginPrettierRecommended = require('eslint-plugin-prettier/recommended');
 
-export default defineConfig([
+module.exports = [
   {
     name: 'Global Ignores',
-    ignores: ['dist', 'node_modules', 'coverage', 'build'],
+    ignores: ['dist', 'node_modules', 'coverage', 'build', 'eslint.config.js'],
   },
   js.configs.recommended,
   ...tseslint.configs.strict,
@@ -57,7 +56,7 @@ export default defineConfig([
   {
     name: 'JavaScript Source Files',
     files: ['**/*.js'],
-    extends: [tseslint.configs.disableTypeChecked],
+    ...tseslint.configs.disableTypeChecked,
   },
   {
     name: 'TypeScript Source Files',
@@ -87,4 +86,4 @@ export default defineConfig([
       ],
     },
   },
-]);
+];
