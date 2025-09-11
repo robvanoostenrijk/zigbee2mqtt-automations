@@ -12,8 +12,12 @@ If you like this project and find it useful, please consider giving it a star on
 
 ### Added
 
-- [scenes]: Added support for scenes.
+- [scenes]: Added support for scenes. See the [readme](README.md).
 - [readme]: Added docs for triggering an automation and executing a scene with mqtt.
+- [package]: Added eslint with the usual plugins.
+- [package]: Added prettier.
+- [workflow]: Added Node CJ workflow.
+- [DevContainer]: Added the Matterbridge Dev Container.
 
 ### Changed
 
