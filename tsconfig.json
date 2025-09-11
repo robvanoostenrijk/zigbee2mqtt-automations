@@ -11,7 +11,7 @@
     "sourceMap": false,
     "skipLibCheck": true,
     "strict": true,
-    "noImplicitAny": false,
+    "noImplicitAny": false
   },
   "include": ["src/**/*.ts"]
 }

@@ -21,15 +21,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/* eslint-disable jsdoc/require-jsdoc */
+/* eslint-disable jsdoc/require-param-type */
+/* eslint-disable jsdoc/require-param-description */
+/* eslint-disable jsdoc/require-returns */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-dynamic-delete */
+/* eslint-disable @typescript-eslint/no-empty-object-type */
+/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable import/no-duplicates */
+/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable @typescript-eslint/no-var-requires */
-const buffer_1 = require("buffer");
+const node_buffer_1 = require("node:buffer");
 // These packages are defined inside zigbee2mqtt and so they are not available here to import!
 // The external extensions are now loaded from a temp directory, we use require to load them from where we know they are
-const path = require("node:path");
-const utilPath = path.join(require.main?.path, "dist", "util");
-const joinPath = require(path.join(utilPath, "data")).default.joinPath;
-const readIfExists = require(path.join(utilPath, "yaml")).default.readIfExists;
+const path = require('node:path');
+const utilPath = path.join(require.main?.path, 'dist', 'util');
+const joinPath = require(path.join(utilPath, 'data')).default.joinPath;
+const readIfExists = require(path.join(utilPath, 'yaml')).default.readIfExists;
 function toArray(item) {
     return Array.isArray(item) ? item : [item];
 }
@@ -67,7 +76,6 @@ var MessagePayload;
     MessagePayload["EXECUTE"] = "execute";
 })(MessagePayload || (MessagePayload = {}));
 class InternalLogger {
-    constructor() { }
     debug(message, ...args) {
         console.log(`\x1b[46m\x1b[97m[Automations]\x1b[0m \x1b[38;5;247m${message}\x1b[0m`, ...args);
     }
@@ -119,8 +127,8 @@ class AutomationsExtension {
         this.mqttBaseTopic = settings.get().mqtt.base_topic;
         this.triggerForTimeouts = {};
         this.turnOffAfterTimeouts = {};
-        this.automationsTopic = "zigbee2mqtt-automations";
-        this.scenesTopic = "zigbee2mqtt-scenes";
+        this.automationsTopic = 'zigbee2mqtt-automations';
+        this.scenesTopic = 'zigbee2mqtt-scenes';
         // eslint-disable-next-line no-useless-escape
         this.automationsTopicRegex = new RegExp(`^${this.automationsTopic}\/(.*)`);
         // eslint-disable-next-line no-useless-escape
@@ -137,11 +145,11 @@ class AutomationsExtension {
           });
         });
         */
-        //this.log.info(`Time automation:`);
+        // this.log.info(`Time automation:`);
         Object.keys(this.timeAutomations).forEach((key) => {
             const timeAutomationArray = this.timeAutomations[key];
             timeAutomationArray.forEach((timeAutomation) => {
-                //this.log.info(`- key: #${key}# automation: ${this.stringify(timeAutomation, true)}`);
+                // this.log.info(`- key: #${key}# automation: ${this.stringify(timeAutomation, true)}`);
                 this.startTimeTriggers(key, timeAutomation);
             });
         });
@@ -151,7 +159,7 @@ class AutomationsExtension {
     parseConfig() {
         let configScenes = {};
         try {
-            configScenes = readIfExists(joinPath("scenes.yaml")) || {};
+            configScenes = readIfExists(joinPath('scenes.yaml')) || {};
             this.scenes = configScenes;
             Object.entries(this.scenes).forEach(([key, configScene]) => {
                 const actions = toArray(configScene);
@@ -171,14 +179,13 @@ class AutomationsExtension {
                 }
             });
         }
-        catch (error) {
+        catch (_error) {
             this.logger.info(`[Automations] Error loading file scenes.yaml: see stderr for explanation`);
         }
         let configAutomations = {};
         try {
             // configAutomations = (yaml.readIfExists(data.joinPath('automations.yaml')) || {}) as ConfigAutomations;
-            configAutomations = (readIfExists(joinPath("automations.yaml")) ||
-                {});
+            configAutomations = (readIfExists(joinPath('automations.yaml')) || {});
         }
         catch (error) {
             this.logger.error(`[Automations] Error loading file automations.yaml: see stderr for explanation`);
@@ -187,9 +194,7 @@ class AutomationsExtension {
         }
         Object.entries(configAutomations).forEach(([key, configAutomation]) => {
             const actions = toArray(configAutomation.action);
-            const conditions = configAutomation.condition
-                ? toArray(configAutomation.condition)
-                : [];
+            const conditions = configAutomation.condition ? toArray(configAutomation.condition) : [];
             const triggers = toArray(configAutomation.trigger);
             // Check automation
             if (configAutomation.active === false) {
@@ -244,8 +249,7 @@ class AutomationsExtension {
                     this.logger.error(`[Automations] Config validation error for [${key}]: condition unknown`);
                     return;
                 }
-                if (condition.entity &&
-                    !this.zigbee.resolveEntity(condition.entity)) {
+                if (condition.entity && !this.zigbee.resolveEntity(condition.entity)) {
                     this.logger.error(`[Automations] Config validation error for [${key}]: condition entity #${condition.entity}# not found`);
                     return;
                 }
@@ -266,11 +270,11 @@ class AutomationsExtension {
                         this.log.debug(`[Automations] For latitude:${timeTrigger.latitude} longitude:${timeTrigger.longitude} elevation:${timeTrigger.elevation ? timeTrigger.elevation : 0} suncalc are:\n`, times);
                         const options = {
                             hour12: false,
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
                         };
-                        const time = times[trigger.time].toLocaleTimeString("en-GB", options);
+                        const time = times[trigger.time].toLocaleTimeString('en-GB', options);
                         this.log.debug(`[Automations] Registering time automation [${key}] trigger: ${time}`);
                         if (!this.timeAutomations[time])
                             this.timeAutomations[time] = [];
@@ -325,15 +329,14 @@ class AutomationsExtension {
     }
     /**
      * Check a time string and return a Date or undefined if error
+     *
+     * @param timeString
      */
     matchTimeString(timeString) {
         if (timeString.length !== 8)
             return undefined;
         const match = timeString.match(/(\d{2}):(\d{2}):(\d{2})/);
-        if (match &&
-            parseInt(match[1], 10) <= 23 &&
-            parseInt(match[2], 10) <= 59 &&
-            parseInt(match[3], 10) <= 59) {
+        if (match && parseInt(match[1], 10) <= 23 && parseInt(match[2], 10) <= 59 && parseInt(match[3], 10) <= 59) {
             const time = new Date();
             time.setHours(parseInt(match[1], 10));
             time.setMinutes(parseInt(match[2], 10));
@@ -362,19 +365,18 @@ class AutomationsExtension {
                 const timeAutomationArray = this.timeAutomations[key];
                 timeAutomationArray.forEach((timeAutomation) => {
                     if (suncalcs.includes(timeAutomation.trigger.time)) {
-                        if (!timeAutomation.trigger.latitude ||
-                            !timeAutomation.trigger.longitude)
+                        if (!timeAutomation.trigger.latitude || !timeAutomation.trigger.longitude)
                             return;
                         const suncalc = new SunCalc();
                         const times = suncalc.getTimes(new Date(), timeAutomation.trigger.latitude, timeAutomation.trigger.longitude, timeAutomation.trigger.elevation ?? 0);
                         // this.log.info(`Key:[${key}] For latitude:${timeAutomation.trigger.latitude} longitude:${timeAutomation.trigger.longitude} elevation:${timeAutomation.trigger.elevation ?? 0} suncalcs are:\n`, times);
                         const options = {
                             hour12: false,
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
                         };
-                        const time = times[timeAutomation.trigger.time].toLocaleTimeString("en-GB", options);
+                        const time = times[timeAutomation.trigger.time].toLocaleTimeString('en-GB', options);
                         // this.log.info(`Registering suncalc time automation at time [${time}] for:`, timeAutomation);
                         this.logger.info(`[Automations] Registering suncalc time automation at time [${time}] for: ${this.stringify(timeAutomation)}`);
                         if (!newTimeAutomations[time])
@@ -401,6 +403,9 @@ class AutomationsExtension {
      * Take the key of TimeAutomations that is a string like hh:mm:ss, convert it in a Date object of today
      * and set the timer if not already passed for today.
      * The timeout callback then will run the automations
+     *
+     * @param key
+     * @param automation
      */
     startTimeTriggers(key, automation) {
         const now = new Date();
@@ -428,15 +433,21 @@ class AutomationsExtension {
      * null - return
      * false - return and stop timer
      * true - start the automation
+     *
+     * @param automation
+     * @param configTrigger
+     * @param update
+     * @param from
+     * @param to
      */
     checkTrigger(automation, configTrigger, update, from, to) {
         let trigger;
         let attribute;
         let result;
         let actions;
-        //this.log.warning(`[Automations] Trigger check [${automation.name}] update: ${this.stringify(update)} from: ${this.stringify(from)} to: ${this.stringify(to)}`);
+        // this.log.warning(`[Automations] Trigger check [${automation.name}] update: ${this.stringify(update)} from: ${this.stringify(from)} to: ${this.stringify(to)}`);
         if (configTrigger.action !== undefined) {
-            if (!Object.prototype.hasOwnProperty.call(update, "action")) {
+            if (!Object.prototype.hasOwnProperty.call(update, 'action')) {
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] no 'action' in update for #${configTrigger.entity}#`);
                 return null;
             }
@@ -449,8 +460,7 @@ class AutomationsExtension {
         else if (configTrigger.attribute !== undefined) {
             trigger = configTrigger;
             attribute = trigger.attribute;
-            if (!Object.prototype.hasOwnProperty.call(update, attribute) ||
-                !Object.prototype.hasOwnProperty.call(to, attribute)) {
+            if (!Object.prototype.hasOwnProperty.call(update, attribute) || !Object.prototype.hasOwnProperty.call(to, attribute)) {
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' published for #${configTrigger.entity}#`);
                 return null;
             }
@@ -458,8 +468,7 @@ class AutomationsExtension {
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' change for #${configTrigger.entity}#`);
                 return null;
             }
-            if (typeof trigger.equal !== "undefined" ||
-                typeof trigger.state !== "undefined") {
+            if (typeof trigger.equal !== 'undefined' || typeof trigger.state !== 'undefined') {
                 const value = trigger.state !== undefined ? trigger.state : trigger.equal;
                 if (to[attribute] !== value) {
                     this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' != ${value} for #${configTrigger.entity}#`);
@@ -471,7 +480,7 @@ class AutomationsExtension {
                 }
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger equal/state ${value} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
             }
-            if (typeof trigger.not_equal !== "undefined") {
+            if (typeof trigger.not_equal !== 'undefined') {
                 if (to[attribute] === trigger.not_equal) {
                     this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' = ${trigger.not_equal} for #${configTrigger.entity}#`);
                     return false;
@@ -482,7 +491,7 @@ class AutomationsExtension {
                 }
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger not equal ${trigger.not_equal} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
             }
-            if (typeof trigger.above !== "undefined") {
+            if (typeof trigger.above !== 'undefined') {
                 if (to[attribute] <= trigger.above) {
                     this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' <= ${trigger.above} for #${configTrigger.entity}#`);
                     return false;
@@ -493,7 +502,7 @@ class AutomationsExtension {
                 }
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger above ${trigger.above} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
             }
-            if (typeof trigger.below !== "undefined") {
+            if (typeof trigger.below !== 'undefined') {
                 if (to[attribute] >= trigger.below) {
                     this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' >= ${trigger.below} for #${configTrigger.entity}#`);
                     return false;
@@ -508,9 +517,8 @@ class AutomationsExtension {
         }
         else if (configTrigger.state !== undefined) {
             trigger = configTrigger;
-            attribute = "state";
-            if (!Object.prototype.hasOwnProperty.call(update, attribute) ||
-                !Object.prototype.hasOwnProperty.call(to, attribute)) {
+            attribute = 'state';
+            if (!Object.prototype.hasOwnProperty.call(update, attribute) || !Object.prototype.hasOwnProperty.call(to, attribute)) {
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' published for #${configTrigger.entity}#`);
                 return null;
             }
@@ -543,8 +551,8 @@ class AutomationsExtension {
     }
     // Return false if condition is false
     checkTimeCondition(automation, condition) {
-        //this.logger.info(`[Automations] checkTimeCondition [${automation.name}]: ${this.stringify(condition)}`);
-        const days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+        // this.logger.info(`[Automations] checkTimeCondition [${automation.name}]: ${this.stringify(condition)}`);
+        const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
         const now = new Date();
         if (condition.weekday && !condition.weekday.includes(days[now.getDay()])) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for weekday: ${this.stringify(condition.weekday)} since today is ${days[now.getDay()]}`);
@@ -575,22 +583,20 @@ class AutomationsExtension {
             }
         }
         if (condition.between) {
-            const [startTimeStr, endTimeStr] = condition.between.split("-");
+            const [startTimeStr, endTimeStr] = condition.between.split('-');
             const startTime = this.matchTimeString(startTimeStr);
             const endTime = this.matchTimeString(endTimeStr);
             if (startTime !== undefined && endTime !== undefined) {
                 // Internal time span: between: 08:00:00-20:00:00
                 if (startTime.getTime() < endTime.getTime()) {
-                    if (now.getTime() < startTime.getTime() ||
-                        now.getTime() > endTime.getTime()) {
+                    if (now.getTime() < startTime.getTime() || now.getTime() > endTime.getTime()) {
                         this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for between: ${condition.between} since now is ${now.toLocaleTimeString()}`);
                         return false;
                     }
                 }
                 // External time span: between: 20:00:00-06:00:00
                 else if (startTime.getTime() > endTime.getTime()) {
-                    if (now.getTime() < startTime.getTime() &&
-                        now.getTime() > endTime.getTime()) {
+                    if (now.getTime() < startTime.getTime() && now.getTime() > endTime.getTime()) {
                         this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for between: ${condition.between} since now is ${now.toLocaleTimeString()}`);
                         return false;
                     }
@@ -614,27 +620,21 @@ class AutomationsExtension {
             this.logger.error(`[Automations] Condition check [${automation.name}] config validation error: entity #${condition.entity}# not found`);
             return false;
         }
-        const attribute = condition.attribute || "state";
+        const attribute = condition.attribute || 'state';
         const value = this.state.get(entity)[attribute];
         if (condition.state !== undefined && value !== condition.state) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not '${condition.state}'`);
             return false;
         }
-        if (condition.attribute !== undefined &&
-            condition.equal !== undefined &&
-            value !== condition.equal) {
+        if (condition.attribute !== undefined && condition.equal !== undefined && value !== condition.equal) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not equal '${condition.equal}'`);
             return false;
         }
-        if (condition.attribute !== undefined &&
-            condition.below !== undefined &&
-            value >= condition.below) {
+        if (condition.attribute !== undefined && condition.below !== undefined && value >= condition.below) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not below '${condition.below}'`);
             return false;
         }
-        if (condition.attribute !== undefined &&
-            condition.above !== undefined &&
-            value <= condition.above) {
+        if (condition.attribute !== undefined && condition.above !== undefined && value <= condition.above) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not above '${condition.above}'`);
             return false;
         }
@@ -644,7 +644,7 @@ class AutomationsExtension {
     runActions(automation, actions) {
         for (const action of actions) {
             // Check if action is scene and run it
-            if (action.scene && typeof action.scene === "string") {
+            if (action.scene && typeof action.scene === 'string') {
                 this.log.warning(`Executing scene: ${action.scene}`);
                 this.runActions({ name: action.scene }, this.scenes[action.scene]);
                 continue;
@@ -656,8 +656,8 @@ class AutomationsExtension {
                 continue;
             }
             let data;
-            //this.log.warn('Payload:', typeof action.payload, action.payload)
-            if (typeof action.payload === "string") {
+            // this.log.warn('Payload:', typeof action.payload, action.payload)
+            if (typeof action.payload === 'string') {
                 if (action.payload === ConfigPayload.TURN_ON) {
                     data = { state: ConfigState.ON };
                 }
@@ -672,18 +672,18 @@ class AutomationsExtension {
                     return;
                 }
             }
-            else if (typeof action.payload === "object") {
+            else if (typeof action.payload === 'object') {
                 data = action.payload;
             }
             else {
                 this.logger.error(`[Automations] Run automation [${automation.name}] for entity #${action.entity}# error: payload can be turn_on turn_off toggle or an object`);
                 return;
             }
-            if (action.logger === "info")
+            if (action.logger === 'info')
                 this.logger.info(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
-            else if (action.logger === "warning")
+            else if (action.logger === 'warning')
                 this.logger.warning(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
-            else if (action.logger === "error")
+            else if (action.logger === 'error')
                 this.logger.error(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
             else
                 this.logger.debug(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
@@ -704,28 +704,28 @@ class AutomationsExtension {
     // Remove automation that has execute_once: true
     removeAutomation(name) {
         this.logger.debug(`[Automations] Uregistering automation [${name}]`);
-        //this.log.warning(`Uregistering automation [${name}]`);
+        // this.log.warning(`Uregistering automation [${name}]`);
         Object.keys(this.eventAutomations).forEach((entity) => {
-            //this.log.warning(`Entity: #${entity}#`);
+            // this.log.warning(`Entity: #${entity}#`);
             Object.values(this.eventAutomations[entity]).forEach((eventAutomation, index) => {
                 if (eventAutomation.name === name) {
-                    //this.log.warning(`Entity: #${entity}# ${index} event automation: ${eventAutomation.name}`);
+                    // this.log.warning(`Entity: #${entity}# ${index} event automation: ${eventAutomation.name}`);
                     this.eventAutomations[entity].splice(index, 1);
                 }
                 else {
-                    //this.log.info(`Entity: #${entity}# ${index} event automation: ${eventAutomation.name}`);
+                    // this.log.info(`Entity: #${entity}# ${index} event automation: ${eventAutomation.name}`);
                 }
             });
         });
         Object.keys(this.timeAutomations).forEach((now) => {
-            //this.log.warning(`Time: #${now}#`);
+            // this.log.warning(`Time: #${now}#`);
             Object.values(this.timeAutomations[now]).forEach((timeAutomation, index) => {
                 if (timeAutomation.name === name) {
-                    //this.log.warning(`Time: #${now}# ${index} time automation: ${timeAutomation.name}`);
+                    // this.log.warning(`Time: #${now}# ${index} time automation: ${timeAutomation.name}`);
                     this.timeAutomations[now].splice(index, 1);
                 }
                 else {
-                    //this.log.info(`Time: #${now}# ${index} time automation: ${timeAutomation.name}`);
+                    // this.log.info(`Time: #${now}# ${index} time automation: ${timeAutomation.name}`);
                 }
             });
         });
@@ -745,7 +745,7 @@ class AutomationsExtension {
         this.logger.debug(`[Automations] Start ${action.turn_off_after} seconds turn_off_after timeout for automation [${automation.name}]`);
         const timeout = setTimeout(() => {
             delete this.turnOffAfterTimeouts[automation.name + action.entity];
-            //this.logger.debug(`[Automations] Turn_off_after timeout for automation [${automation.name}]`);
+            // this.logger.debug(`[Automations] Turn_off_after timeout for automation [${automation.name}]`);
             const entity = this.zigbee.resolveEntity(action.entity);
             if (!entity) {
                 this.logger.error(`[Automations] Entity #${action.entity}# not found so ignoring this action`);
@@ -753,22 +753,22 @@ class AutomationsExtension {
                 return;
             }
             const data = action.payload_off ?? { state: ConfigState.OFF };
-            if (action.logger === "info")
+            if (action.logger === 'info')
                 this.logger.info(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
-            else if (action.logger === "warning")
+            else if (action.logger === 'warning')
                 this.logger.warning(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
-            else if (action.logger === "error")
+            else if (action.logger === 'error')
                 this.logger.error(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
             else
                 this.logger.debug(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
-            this.mqtt.onMessage(`${this.mqttBaseTopic}/${entity.name}/set`, buffer_1.Buffer.from(this.payloadStringify(data)));
+            this.mqtt.onMessage(`${this.mqttBaseTopic}/${entity.name}/set`, node_buffer_1.Buffer.from(this.payloadStringify(data)));
         }, action.turn_off_after * 1000);
         timeout.unref();
         this.turnOffAfterTimeouts[automation.name + action.entity] = timeout;
     }
     runActionsWithConditions(automation, conditions, actions) {
         for (const condition of conditions) {
-            //this.log.warning(`runActionsWithConditions: conditon: ${this.stringify(condition)}`);
+            // this.log.warning(`runActionsWithConditions: conditon: ${this.stringify(condition)}`);
             if (!this.checkCondition(automation, condition)) {
                 return;
             }
@@ -779,7 +779,7 @@ class AutomationsExtension {
     stopTriggerForTimeout(automation) {
         const timeout = this.triggerForTimeouts[automation.name];
         if (timeout) {
-            //this.log.debug(`Stop timeout for automation [${automation.name}] trigger: ${this.stringify(automation.trigger)}`);
+            // this.log.debug(`Stop timeout for automation [${automation.name}] trigger: ${this.stringify(automation.trigger)}`);
             this.logger.debug(`[Automations] Stop trigger-for timeout for automation [${automation.name}]`);
             clearTimeout(timeout);
             delete this.triggerForTimeouts[automation.name];
@@ -899,34 +899,34 @@ class AutomationsExtension {
     payloadStringify(payload) {
         return this.stringify(payload, false, 255, 255, 35, 220, 159, 1, '"', '"');
     }
-    stringify(payload, enableColors = false, colorPayload = 255, colorKey = 255, colorString = 35, colorNumber = 220, colorBoolean = 159, colorUndefined = 1, keyQuote = "", stringQuote = "'") {
+    stringify(payload, enableColors = false, colorPayload = 255, colorKey = 255, colorString = 35, colorNumber = 220, colorBoolean = 159, colorUndefined = 1, keyQuote = '', stringQuote = "'") {
         const clr = (color) => {
-            return enableColors ? `\x1b[38;5;${color}m` : "";
+            return enableColors ? `\x1b[38;5;${color}m` : '';
         };
         const reset = () => {
-            return enableColors ? `\x1b[0m` : "";
+            return enableColors ? `\x1b[0m` : '';
         };
         const isArray = Array.isArray(payload);
-        let string = `${reset()}${clr(colorPayload)}` + (isArray ? "[ " : "{ ");
+        let string = `${reset()}${clr(colorPayload)}` + (isArray ? '[ ' : '{ ');
         Object.entries(payload).forEach(([key, value], index) => {
             if (index > 0) {
-                string += ", ";
+                string += ', ';
             }
-            let newValue = "";
+            let newValue = '';
             newValue = value;
-            if (typeof newValue === "string") {
+            if (typeof newValue === 'string') {
                 newValue = `${clr(colorString)}${stringQuote}${newValue}${stringQuote}${reset()}`;
             }
-            if (typeof newValue === "number") {
+            if (typeof newValue === 'number') {
                 newValue = `${clr(colorNumber)}${newValue}${reset()}`;
             }
-            if (typeof newValue === "boolean") {
+            if (typeof newValue === 'boolean') {
                 newValue = `${clr(colorBoolean)}${newValue}${reset()}`;
             }
-            if (typeof newValue === "undefined") {
+            if (typeof newValue === 'undefined') {
                 newValue = `${clr(colorUndefined)}undefined${reset()}`;
             }
-            if (typeof newValue === "object") {
+            if (typeof newValue === 'object') {
                 newValue = this.stringify(newValue, enableColors, colorPayload, colorKey, colorString, colorNumber, colorBoolean, colorUndefined, keyQuote, stringQuote);
             }
             // new
@@ -935,8 +935,7 @@ class AutomationsExtension {
             else
                 string += `${clr(colorKey)}${keyQuote}${key}${keyQuote}${reset()}: ${newValue}`;
         });
-        return (string +=
-            ` ${clr(colorPayload)}` + (isArray ? "]" : "}") + `${reset()}`);
+        return (string += ` ${clr(colorPayload)}` + (isArray ? ']' : '}') + `${reset()}`);
     }
 }
 /*
@@ -1052,12 +1051,12 @@ class SunCalc {
     }
     // sun times configuration (angle, morning name, evening name)
     times = [
-        [-0.833, "sunrise", "sunset"],
-        [-0.3, "sunriseEnd", "sunsetStart"],
-        [-6, "dawn", "dusk"],
-        [-12, "nauticalDawn", "nauticalDusk"],
-        [-18, "nightEnd", "night"],
-        [6, "goldenHourEnd", "goldenHour"],
+        [-0.833, 'sunrise', 'sunset'],
+        [-0.3, 'sunriseEnd', 'sunsetStart'],
+        [-6, 'dawn', 'dusk'],
+        [-12, 'nauticalDawn', 'nauticalDusk'],
+        [-18, 'nightEnd', 'night'],
+        [6, 'goldenHourEnd', 'goldenHour'],
     ];
     // adds a custom time to the times config
     // @ts-ignore: Unused method
@@ -1162,7 +1161,7 @@ class SunCalc {
         if (set)
             result[set] = hoursLater(t, set);
         if (!rise && !set)
-            result[ye > 0 ? "alwaysUp" : "alwaysDown"] = true;
+            result[ye > 0 ? 'alwaysUp' : 'alwaysDown'] = true;
         return result;
     }
 }

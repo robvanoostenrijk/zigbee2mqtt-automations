@@ -4,9 +4,7 @@
     {
       "type": "npm",
       "script": "start",
-      "problemMatcher": [
-        "$tsc-watch"
-      ],
+      "problemMatcher": ["$tsc-watch"],
       "label": "npm: start",
       "detail": "tsc --watch",
       "isBackground": true

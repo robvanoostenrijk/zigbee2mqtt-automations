@@ -29,8 +29,17 @@
   },
   "homepage": "https://github.com/Luligu/zigbee2mqtt-automations#readme",
   "devDependencies": {
+    "@eslint/js": "9.35.0",
     "@types/node": "24.3.1",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-jsdoc": "56.1.2",
+    "eslint-plugin-n": "17.21.3",
+    "eslint-plugin-prettier": "5.5.4",
+    "eslint-plugin-promise": "7.2.1",
+    "prettier": "3.6.2",
     "typescript": "5.9.2",
+    "typescript-eslint": "8.43.0",
     "zigbee2mqtt": "2.6.1"
   },
   "scripts": {
@@ -38,6 +47,10 @@
     "build": "tsc",
     "clean": "npx shx rm -rf tsconfig.tsbuildinfo dist coverage jest temp package-lock.json npm-shrinkwrap.json node_modules/* node_modules/.[!.]* node_modules/..?*",
     "reset": "npm run clean && npm install && npm run build",
+    "lint": "eslint --max-warnings=0 .",
+    "lint:fix": "eslint --fix --max-warnings=0 .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "checkDependencies": "npx npm-check-updates",
     "updateDependencies": "npx npm-check-updates -u && npm run reset"
   }
