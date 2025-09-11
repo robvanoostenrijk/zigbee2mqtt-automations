@@ -66,9 +66,9 @@ Don't modify configuration.yaml.
 
 # How to reload the automations when the file automations.yaml has been modified
 
-In frontend go to Extensions. Select automation.js and save. The extension is reloaded and the automations.yaml is reloaded too.
+In the frontend go to Extensions. Select automation.js and save. The extension is reloaded and the automations.yaml ans scenes.yaml are reloaded too.
 
-# How to execute an automaations publishing a command to mqtt
+# How to execute an automations publishing a command to mqtt
 
 Publish topic: **"zigbee2mqtt-automations/Name"** and a raw message: **"execute"** where "Name" is the name of your automation in automations.yaml.
 
