@@ -1,14 +1,25 @@
 "use strict";
 /**
- * This file contains the class AutomationsExtension and its definitions.
- *
+ * @description This file contains the class AutomationsExtension and its definitions.
  * @file automations.ts
- * @author Luligu (https://github.com/Luligu)
- * @copyright 2023, 2024, 2025 Luligu
- * @date 2023-10-15
+ * @author Luca Liguori
+ * @created 2023-10-15
+ * @version 3.0.0
+ * @license Apache-2.0
  *
- * See LICENSE in the root.
+ * Copyright 2023, 2024, 2025, 2026, 2027 Luca Liguori.
  *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -71,6 +82,28 @@ class InternalLogger {
     }
 }
 class AutomationsExtension {
+    zigbee;
+    mqtt;
+    state;
+    publishEntityState;
+    eventBus;
+    enableDisableExtension;
+    restartCallback;
+    addExtension;
+    settings;
+    logger;
+    mqttBaseTopic;
+    automationsTopic;
+    scenesTopic;
+    automationsTopicRegex;
+    scenesTopicRegex;
+    scenes = {};
+    eventAutomations = {};
+    timeAutomations = {};
+    triggerForTimeouts;
+    turnOffAfterTimeouts;
+    midnightTimeout;
+    log;
     constructor(zigbee, mqtt, state, publishEntityState, eventBus, enableDisableExtension, restartCallback, addExtension, settings, logger) {
         this.zigbee = zigbee;
         this.mqtt = mqtt;
@@ -82,15 +115,16 @@ class AutomationsExtension {
         this.addExtension = addExtension;
         this.settings = settings;
         this.logger = logger;
-        this.eventAutomations = {};
-        this.timeAutomations = {};
         this.log = new InternalLogger();
         this.mqttBaseTopic = settings.get().mqtt.base_topic;
         this.triggerForTimeouts = {};
         this.turnOffAfterTimeouts = {};
-        this.automationsTopic = 'zigbee2mqtt-automations';
+        this.automationsTopic = "zigbee2mqtt-automations";
+        this.scenesTopic = "zigbee2mqtt-scenes";
         // eslint-disable-next-line no-useless-escape
-        this.topicRegex = new RegExp(`^${this.automationsTopic}\/(.*)`);
+        this.automationsTopicRegex = new RegExp(`^${this.automationsTopic}\/(.*)`);
+        // eslint-disable-next-line no-useless-escape
+        this.scenesTopicRegex = new RegExp(`^${this.scenesTopic}\/(.*)`);
         this.logger.info(`[Automations] Loading automation.js`);
         if (!this.parseConfig())
             return;
@@ -104,9 +138,9 @@ class AutomationsExtension {
         });
         */
         //this.log.info(`Time automation:`);
-        Object.keys(this.timeAutomations).forEach(key => {
+        Object.keys(this.timeAutomations).forEach((key) => {
             const timeAutomationArray = this.timeAutomations[key];
-            timeAutomationArray.forEach(timeAutomation => {
+            timeAutomationArray.forEach((timeAutomation) => {
                 //this.log.info(`- key: #${key}# automation: ${this.stringify(timeAutomation, true)}`);
                 this.startTimeTriggers(key, timeAutomation);
             });
@@ -115,10 +149,36 @@ class AutomationsExtension {
         this.logger.info(`[Automations] Automation.js loaded`);
     }
     parseConfig() {
+        let configScenes = {};
+        try {
+            configScenes = readIfExists(joinPath("scenes.yaml")) || {};
+            this.scenes = configScenes;
+            Object.entries(this.scenes).forEach(([key, configScene]) => {
+                const actions = toArray(configScene);
+                this.logger.info(`[Scenes] Registering scene [${key}]`);
+                for (const action of actions) {
+                    if (action.entity) {
+                        if (!this.zigbee.resolveEntity(action.entity)) {
+                            this.logger.error(`[Scenes] Config validation error for [${key}]: entity #${action.entity}# not found`);
+                        }
+                        if (!action.payload) {
+                            this.logger.error(`[Scenes] Config validation error for [${key}]: entity #${action.entity}# payload not found`);
+                        }
+                    }
+                    else if (action.scene) {
+                        this.logger.info(`[Scenes] - scene #${action.scene}#`);
+                    }
+                }
+            });
+        }
+        catch (error) {
+            this.logger.info(`[Automations] Error loading file scenes.yaml: see stderr for explanation`);
+        }
         let configAutomations = {};
         try {
             // configAutomations = (yaml.readIfExists(data.joinPath('automations.yaml')) || {}) as ConfigAutomations;
-            configAutomations = (readIfExists(joinPath('automations.yaml')) || {});
+            configAutomations = (readIfExists(joinPath("automations.yaml")) ||
+                {});
         }
         catch (error) {
             this.logger.error(`[Automations] Error loading file automations.yaml: see stderr for explanation`);
@@ -127,7 +187,9 @@ class AutomationsExtension {
         }
         Object.entries(configAutomations).forEach(([key, configAutomation]) => {
             const actions = toArray(configAutomation.action);
-            const conditions = configAutomation.condition ? toArray(configAutomation.condition) : [];
+            const conditions = configAutomation.condition
+                ? toArray(configAutomation.condition)
+                : [];
             const triggers = toArray(configAutomation.trigger);
             // Check automation
             if (configAutomation.active === false) {
@@ -155,26 +217,35 @@ class AutomationsExtension {
             }
             // Check actions
             for (const action of actions) {
-                if (!action.entity) {
-                    this.logger.error(`[Automations] Config validation error for [${key}]: action entity not defined`);
+                if (!action.entity && !action.scene) {
+                    this.logger.error(`[Automations] Config validation error for [${key}]: action entity or action scene not defined`);
                     return;
                 }
-                if (!this.zigbee.resolveEntity(action.entity)) {
+                if (action.entity && !this.zigbee.resolveEntity(action.entity)) {
                     this.logger.error(`[Automations] Config validation error for [${key}]: action entity #${action.entity}# not found`);
                     return;
                 }
-                if (!action.payload) {
+                if (action.entity && !action.payload) {
                     this.logger.error(`[Automations] Config validation error for [${key}]: action payload not defined`);
+                    return;
+                }
+                if (action.scene && !this.scenes[action.scene]) {
+                    this.logger.error(`[Automations] Config validation error for [${key}]: action scene #${action.scene}# not found`);
                     return;
                 }
             }
             // Check conditions
             for (const condition of conditions) {
-                if (!condition.entity && !condition.after && !condition.before && !condition.between && !condition.weekday) {
+                if (!condition.entity &&
+                    !condition.after &&
+                    !condition.before &&
+                    !condition.between &&
+                    !condition.weekday) {
                     this.logger.error(`[Automations] Config validation error for [${key}]: condition unknown`);
                     return;
                 }
-                if (condition.entity && !this.zigbee.resolveEntity(condition.entity)) {
+                if (condition.entity &&
+                    !this.zigbee.resolveEntity(condition.entity)) {
                     this.logger.error(`[Automations] Config validation error for [${key}]: condition entity #${condition.entity}# not found`);
                     return;
                 }
@@ -193,17 +264,34 @@ class AutomationsExtension {
                         const times = suncalc.getTimes(new Date(), timeTrigger.latitude, timeTrigger.longitude, timeTrigger.elevation ? timeTrigger.elevation : 0);
                         this.logger.debug(`[Automations] Sunrise at ${times[ConfigSunCalc.SUNRISE].toLocaleTimeString()} sunset at ${times[ConfigSunCalc.SUNSET].toLocaleTimeString()} for latitude:${timeTrigger.latitude} longitude:${timeTrigger.longitude} elevation:${timeTrigger.elevation ? timeTrigger.elevation : 0}`);
                         this.log.debug(`[Automations] For latitude:${timeTrigger.latitude} longitude:${timeTrigger.longitude} elevation:${timeTrigger.elevation ? timeTrigger.elevation : 0} suncalc are:\n`, times);
-                        const options = { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
-                        const time = times[trigger.time].toLocaleTimeString('en-GB', options);
+                        const options = {
+                            hour12: false,
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                        };
+                        const time = times[trigger.time].toLocaleTimeString("en-GB", options);
                         this.log.debug(`[Automations] Registering time automation [${key}] trigger: ${time}`);
                         if (!this.timeAutomations[time])
                             this.timeAutomations[time] = [];
-                        this.timeAutomations[time].push({ name: key, execute_once: configAutomation.execute_once, trigger: timeTrigger, action: actions, condition: conditions });
+                        this.timeAutomations[time].push({
+                            name: key,
+                            execute_once: configAutomation.execute_once,
+                            trigger: timeTrigger,
+                            action: actions,
+                            condition: conditions,
+                        });
                     }
                     else if (this.matchTimeString(timeTrigger.time)) {
                         if (!this.timeAutomations[timeTrigger.time])
                             this.timeAutomations[timeTrigger.time] = [];
-                        this.timeAutomations[timeTrigger.time].push({ name: key, execute_once: configAutomation.execute_once, trigger: timeTrigger, action: actions, condition: conditions });
+                        this.timeAutomations[timeTrigger.time].push({
+                            name: key,
+                            execute_once: configAutomation.execute_once,
+                            trigger: timeTrigger,
+                            action: actions,
+                            condition: conditions,
+                        });
                     }
                     else {
                         this.logger.error(`[Automations] Config validation error for [${key}]: time syntax error for ${trigger.time}`);
@@ -222,7 +310,13 @@ class AutomationsExtension {
                         if (!this.eventAutomations[entity]) {
                             this.eventAutomations[entity] = [];
                         }
-                        this.eventAutomations[entity].push({ name: key, execute_once: configAutomation.execute_once, trigger: eventTrigger, action: actions, condition: conditions });
+                        this.eventAutomations[entity].push({
+                            name: key,
+                            execute_once: configAutomation.execute_once,
+                            trigger: eventTrigger,
+                            action: actions,
+                            condition: conditions,
+                        });
                     }
                 }
             } // for (const trigger of triggers)
@@ -236,7 +330,10 @@ class AutomationsExtension {
         if (timeString.length !== 8)
             return undefined;
         const match = timeString.match(/(\d{2}):(\d{2}):(\d{2})/);
-        if (match && parseInt(match[1], 10) <= 23 && parseInt(match[2], 10) <= 59 && parseInt(match[3], 10) <= 59) {
+        if (match &&
+            parseInt(match[1], 10) <= 23 &&
+            parseInt(match[2], 10) <= 59 &&
+            parseInt(match[3], 10) <= 59) {
             const time = new Date();
             time.setHours(parseInt(match[1], 10));
             time.setMinutes(parseInt(match[2], 10));
@@ -261,18 +358,24 @@ class AutomationsExtension {
             this.logger.info(`[Automations] Run timeout to reload time automations`);
             const newTimeAutomations = {};
             const suncalcs = Object.values(ConfigSunCalc);
-            Object.keys(this.timeAutomations).forEach(key => {
+            Object.keys(this.timeAutomations).forEach((key) => {
                 const timeAutomationArray = this.timeAutomations[key];
-                timeAutomationArray.forEach(timeAutomation => {
+                timeAutomationArray.forEach((timeAutomation) => {
                     if (suncalcs.includes(timeAutomation.trigger.time)) {
-                        if (!timeAutomation.trigger.latitude || !timeAutomation.trigger.longitude)
+                        if (!timeAutomation.trigger.latitude ||
+                            !timeAutomation.trigger.longitude)
                             return;
                         const suncalc = new SunCalc();
                         const times = suncalc.getTimes(new Date(), timeAutomation.trigger.latitude, timeAutomation.trigger.longitude, timeAutomation.trigger.elevation ?? 0);
                         // this.log.info(`Key:[${key}] For latitude:${timeAutomation.trigger.latitude} longitude:${timeAutomation.trigger.longitude} elevation:${timeAutomation.trigger.elevation ?? 0} suncalcs are:\n`, times);
-                        const options = { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
-                        const time = times[timeAutomation.trigger.time].toLocaleTimeString('en-GB', options);
-                        // this.log.info(`Registering suncalc time automation at time [${time}] for:`, timeAutomation);                   
+                        const options = {
+                            hour12: false,
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                        };
+                        const time = times[timeAutomation.trigger.time].toLocaleTimeString("en-GB", options);
+                        // this.log.info(`Registering suncalc time automation at time [${time}] for:`, timeAutomation);
                         this.logger.info(`[Automations] Registering suncalc time automation at time [${time}] for: ${this.stringify(timeAutomation)}`);
                         if (!newTimeAutomations[time])
                             newTimeAutomations[time] = [];
@@ -333,7 +436,7 @@ class AutomationsExtension {
         let actions;
         //this.log.warning(`[Automations] Trigger check [${automation.name}] update: ${this.stringify(update)} from: ${this.stringify(from)} to: ${this.stringify(to)}`);
         if (configTrigger.action !== undefined) {
-            if (!Object.prototype.hasOwnProperty.call(update, 'action')) {
+            if (!Object.prototype.hasOwnProperty.call(update, "action")) {
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] no 'action' in update for #${configTrigger.entity}#`);
                 return null;
             }
@@ -346,7 +449,8 @@ class AutomationsExtension {
         else if (configTrigger.attribute !== undefined) {
             trigger = configTrigger;
             attribute = trigger.attribute;
-            if (!Object.prototype.hasOwnProperty.call(update, attribute) || !Object.prototype.hasOwnProperty.call(to, attribute)) {
+            if (!Object.prototype.hasOwnProperty.call(update, attribute) ||
+                !Object.prototype.hasOwnProperty.call(to, attribute)) {
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' published for #${configTrigger.entity}#`);
                 return null;
             }
@@ -354,7 +458,8 @@ class AutomationsExtension {
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' change for #${configTrigger.entity}#`);
                 return null;
             }
-            if (typeof trigger.equal !== 'undefined' || typeof trigger.state !== 'undefined') {
+            if (typeof trigger.equal !== "undefined" ||
+                typeof trigger.state !== "undefined") {
                 const value = trigger.state !== undefined ? trigger.state : trigger.equal;
                 if (to[attribute] !== value) {
                     this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' != ${value} for #${configTrigger.entity}#`);
@@ -366,7 +471,7 @@ class AutomationsExtension {
                 }
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger equal/state ${value} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
             }
-            if (typeof trigger.not_equal !== 'undefined') {
+            if (typeof trigger.not_equal !== "undefined") {
                 if (to[attribute] === trigger.not_equal) {
                     this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' = ${trigger.not_equal} for #${configTrigger.entity}#`);
                     return false;
@@ -377,7 +482,7 @@ class AutomationsExtension {
                 }
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger not equal ${trigger.not_equal} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
             }
-            if (typeof trigger.above !== 'undefined') {
+            if (typeof trigger.above !== "undefined") {
                 if (to[attribute] <= trigger.above) {
                     this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' <= ${trigger.above} for #${configTrigger.entity}#`);
                     return false;
@@ -388,7 +493,7 @@ class AutomationsExtension {
                 }
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger above ${trigger.above} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
             }
-            if (typeof trigger.below !== 'undefined') {
+            if (typeof trigger.below !== "undefined") {
                 if (to[attribute] >= trigger.below) {
                     this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' >= ${trigger.below} for #${configTrigger.entity}#`);
                     return false;
@@ -403,8 +508,9 @@ class AutomationsExtension {
         }
         else if (configTrigger.state !== undefined) {
             trigger = configTrigger;
-            attribute = 'state';
-            if (!Object.prototype.hasOwnProperty.call(update, attribute) || !Object.prototype.hasOwnProperty.call(to, attribute)) {
+            attribute = "state";
+            if (!Object.prototype.hasOwnProperty.call(update, attribute) ||
+                !Object.prototype.hasOwnProperty.call(to, attribute)) {
                 this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' published for #${configTrigger.entity}#`);
                 return null;
             }
@@ -424,18 +530,21 @@ class AutomationsExtension {
     checkCondition(automation, condition) {
         let timeResult = true;
         let eventResult = true;
-        if (condition.after || condition.before || condition.between || condition.weekday) {
+        if (condition.after ||
+            condition.before ||
+            condition.between ||
+            condition.weekday) {
             timeResult = this.checkTimeCondition(automation, condition);
         }
         if (condition.entity) {
             eventResult = this.checkEntityCondition(automation, condition);
         }
-        return (timeResult && eventResult);
+        return timeResult && eventResult;
     }
     // Return false if condition is false
     checkTimeCondition(automation, condition) {
         //this.logger.info(`[Automations] checkTimeCondition [${automation.name}]: ${this.stringify(condition)}`);
-        const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
         const now = new Date();
         if (condition.weekday && !condition.weekday.includes(days[now.getDay()])) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for weekday: ${this.stringify(condition.weekday)} since today is ${days[now.getDay()]}`);
@@ -466,20 +575,22 @@ class AutomationsExtension {
             }
         }
         if (condition.between) {
-            const [startTimeStr, endTimeStr] = condition.between.split('-');
+            const [startTimeStr, endTimeStr] = condition.between.split("-");
             const startTime = this.matchTimeString(startTimeStr);
             const endTime = this.matchTimeString(endTimeStr);
             if (startTime !== undefined && endTime !== undefined) {
-                // Internal time span: between: 08:00:00-20:00:00  
+                // Internal time span: between: 08:00:00-20:00:00
                 if (startTime.getTime() < endTime.getTime()) {
-                    if (now.getTime() < startTime.getTime() || now.getTime() > endTime.getTime()) {
+                    if (now.getTime() < startTime.getTime() ||
+                        now.getTime() > endTime.getTime()) {
                         this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for between: ${condition.between} since now is ${now.toLocaleTimeString()}`);
                         return false;
                     }
                 }
-                // External time span: between: 20:00:00-06:00:00  
+                // External time span: between: 20:00:00-06:00:00
                 else if (startTime.getTime() > endTime.getTime()) {
-                    if (now.getTime() < startTime.getTime() && now.getTime() > endTime.getTime()) {
+                    if (now.getTime() < startTime.getTime() &&
+                        now.getTime() > endTime.getTime()) {
                         this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for between: ${condition.between} since now is ${now.toLocaleTimeString()}`);
                         return false;
                     }
@@ -503,21 +614,27 @@ class AutomationsExtension {
             this.logger.error(`[Automations] Condition check [${automation.name}] config validation error: entity #${condition.entity}# not found`);
             return false;
         }
-        const attribute = condition.attribute || 'state';
+        const attribute = condition.attribute || "state";
         const value = this.state.get(entity)[attribute];
         if (condition.state !== undefined && value !== condition.state) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not '${condition.state}'`);
             return false;
         }
-        if (condition.attribute !== undefined && condition.equal !== undefined && value !== condition.equal) {
+        if (condition.attribute !== undefined &&
+            condition.equal !== undefined &&
+            value !== condition.equal) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not equal '${condition.equal}'`);
             return false;
         }
-        if (condition.attribute !== undefined && condition.below !== undefined && value >= condition.below) {
+        if (condition.attribute !== undefined &&
+            condition.below !== undefined &&
+            value >= condition.below) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not below '${condition.below}'`);
             return false;
         }
-        if (condition.attribute !== undefined && condition.above !== undefined && value <= condition.above) {
+        if (condition.attribute !== undefined &&
+            condition.above !== undefined &&
+            value <= condition.above) {
             this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not above '${condition.above}'`);
             return false;
         }
@@ -526,6 +643,13 @@ class AutomationsExtension {
     }
     runActions(automation, actions) {
         for (const action of actions) {
+            // Check if action is scene and run it
+            if (action.scene && typeof action.scene === "string") {
+                this.log.warning(`Executing scene: ${action.scene}`);
+                this.runActions({ name: action.scene }, this.scenes[action.scene]);
+                continue;
+            }
+            // Check if action is entity and run it
             const entity = this.zigbee.resolveEntity(action.entity);
             if (!entity) {
                 this.logger.error(`[Automations] Entity #${action.entity}# not found so ignoring this action`);
@@ -533,7 +657,7 @@ class AutomationsExtension {
             }
             let data;
             //this.log.warn('Payload:', typeof action.payload, action.payload)
-            if (typeof action.payload === 'string') {
+            if (typeof action.payload === "string") {
                 if (action.payload === ConfigPayload.TURN_ON) {
                     data = { state: ConfigState.ON };
                 }
@@ -548,22 +672,27 @@ class AutomationsExtension {
                     return;
                 }
             }
-            else if (typeof action.payload === 'object') {
+            else if (typeof action.payload === "object") {
                 data = action.payload;
             }
             else {
                 this.logger.error(`[Automations] Run automation [${automation.name}] for entity #${action.entity}# error: payload can be turn_on turn_off toggle or an object`);
                 return;
             }
-            if (action.logger === 'info')
+            if (action.logger === "info")
                 this.logger.info(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
-            else if (action.logger === 'warning')
+            else if (action.logger === "warning")
                 this.logger.warning(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
-            else if (action.logger === 'error')
+            else if (action.logger === "error")
                 this.logger.error(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
             else
                 this.logger.debug(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
-            this.mqtt.onMessage(`${this.mqttBaseTopic}/${entity.name}/set`, buffer_1.Buffer.from(this.payloadStringify(data)));
+            // this.mqtt.onMessage(`${this.mqttBaseTopic}/${entity.name}/set`, Buffer.from(this.payloadStringify(data)));
+            // This is even faster cause we skip one passage.
+            this.eventBus.emitMQTTMessage({
+                topic: `${this.mqttBaseTopic}/${entity.name}/set`,
+                message: this.payloadStringify(data),
+            });
             if (action.turn_off_after) {
                 this.startActionTurnOffTimeout(automation, action);
             }
@@ -624,11 +753,11 @@ class AutomationsExtension {
                 return;
             }
             const data = action.payload_off ?? { state: ConfigState.OFF };
-            if (action.logger === 'info')
+            if (action.logger === "info")
                 this.logger.info(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
-            else if (action.logger === 'warning')
+            else if (action.logger === "warning")
                 this.logger.warning(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
-            else if (action.logger === 'error')
+            else if (action.logger === "error")
                 this.logger.error(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
             else
                 this.logger.debug(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
@@ -703,15 +832,19 @@ class AutomationsExtension {
             this.runAutomationIfMatches(automation, update, from, to);
         }
     }
+    // Process MQTT messages private message for automations.
+    // Publish: topic "zigbee2mqtt-automations/<automation_name>" with raw message "execute"
+    // Publish: topic "zigbee2mqtt-scenes/<scene_name>" with raw message "execute"
     processMessage(message) {
-        const match = message.topic.match(this.topicRegex);
-        if (match) {
+        const automationsMatch = message.topic.match(this.automationsTopicRegex);
+        if (automationsMatch) {
             for (const automations of Object.values(this.eventAutomations)) {
                 for (const automation of automations) {
-                    if (automation.name == match[1]) {
-                        this.logger.info(`[Automations] MQTT message for [${match[1]}]: ${message.message}`);
-                        switch (message.message) {
+                    if (automation.name == automationsMatch[1]) {
+                        this.logger.info(`[Automations] MQTT message for [${automationsMatch[1]}]: "${message.message}"`);
+                        switch (message.message.trim()) {
                             case MessagePayload.EXECUTE:
+                                this.log.warning(`Executing automation "${automation.name}": ${this.stringify(automation.action, true)}`);
                                 this.runActions(automation, automation.action);
                                 break;
                         }
@@ -720,6 +853,20 @@ class AutomationsExtension {
                 }
             }
         }
+        const scenesMatch = message.topic.match(this.scenesTopicRegex);
+        if (scenesMatch) {
+            Object.entries(this.scenes).forEach(([key]) => {
+                if (key == scenesMatch[1]) {
+                    this.logger.info(`[Scenes] MQTT message for [${scenesMatch[1]}]: "${message.message}"`);
+                    switch (message.message.trim()) {
+                        case MessagePayload.EXECUTE:
+                            this.log.warning(`Executing scene "${key}": ${this.stringify(this.scenes[key], true)}`);
+                            this.runActions({ name: key }, this.scenes[key]);
+                            break;
+                    }
+                }
+            });
+        }
     }
     async start() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -727,6 +874,7 @@ class AutomationsExtension {
             this.findAndRun(data.entity.name, data.update, data.from, data.to);
         });
         this.mqtt.subscribe(`${this.automationsTopic}/+`);
+        this.mqtt.subscribe(`${this.scenesTopic}/+`);
         this.eventBus.onMQTTMessage(this, (data) => {
             this.processMessage(data);
         });
@@ -751,34 +899,34 @@ class AutomationsExtension {
     payloadStringify(payload) {
         return this.stringify(payload, false, 255, 255, 35, 220, 159, 1, '"', '"');
     }
-    stringify(payload, enableColors = false, colorPayload = 255, colorKey = 255, colorString = 35, colorNumber = 220, colorBoolean = 159, colorUndefined = 1, keyQuote = '', stringQuote = '\'') {
+    stringify(payload, enableColors = false, colorPayload = 255, colorKey = 255, colorString = 35, colorNumber = 220, colorBoolean = 159, colorUndefined = 1, keyQuote = "", stringQuote = "'") {
         const clr = (color) => {
-            return enableColors ? `\x1b[38;5;${color}m` : '';
+            return enableColors ? `\x1b[38;5;${color}m` : "";
         };
         const reset = () => {
-            return enableColors ? `\x1b[0m` : '';
+            return enableColors ? `\x1b[0m` : "";
         };
         const isArray = Array.isArray(payload);
-        let string = `${reset()}${clr(colorPayload)}` + (isArray ? '[ ' : '{ ');
+        let string = `${reset()}${clr(colorPayload)}` + (isArray ? "[ " : "{ ");
         Object.entries(payload).forEach(([key, value], index) => {
             if (index > 0) {
-                string += ', ';
+                string += ", ";
             }
-            let newValue = '';
+            let newValue = "";
             newValue = value;
-            if (typeof newValue === 'string') {
+            if (typeof newValue === "string") {
                 newValue = `${clr(colorString)}${stringQuote}${newValue}${stringQuote}${reset()}`;
             }
-            if (typeof newValue === 'number') {
+            if (typeof newValue === "number") {
                 newValue = `${clr(colorNumber)}${newValue}${reset()}`;
             }
-            if (typeof newValue === 'boolean') {
+            if (typeof newValue === "boolean") {
                 newValue = `${clr(colorBoolean)}${newValue}${reset()}`;
             }
-            if (typeof newValue === 'undefined') {
+            if (typeof newValue === "undefined") {
                 newValue = `${clr(colorUndefined)}undefined${reset()}`;
             }
-            if (typeof newValue === 'object') {
+            if (typeof newValue === "object") {
                 newValue = this.stringify(newValue, enableColors, colorPayload, colorKey, colorString, colorNumber, colorBoolean, colorUndefined, keyQuote, stringQuote);
             }
             // new
@@ -787,7 +935,8 @@ class AutomationsExtension {
             else
                 string += `${clr(colorKey)}${keyQuote}${key}${keyQuote}${reset()}: ${newValue}`;
         });
-        return string += ` ${clr(colorPayload)}` + (isArray ? ']' : '}') + `${reset()}`;
+        return (string +=
+            ` ${clr(colorPayload)}` + (isArray ? "]" : "}") + `${reset()}`);
     }
 }
 /*
@@ -801,25 +950,44 @@ FROM HERE IS THE COPY IN TS OF SUNCALC PACKAGE https://www.npmjs.com/package/sun
 const PI = Math.PI, sin = Math.sin, cos = Math.cos, tan = Math.tan, asin = Math.asin, atan = Math.atan2, acos = Math.acos, rad = PI / 180;
 // date/time constants and conversions
 const dayMs = 1000 * 60 * 60 * 24, J1970 = 2440588, J2000 = 2451545;
-function toJulian(date) { return date.valueOf() / dayMs - 0.5 + J1970; }
-function fromJulian(j) { return new Date((j + 0.5 - J1970) * dayMs); }
-function toDays(date) { return toJulian(date) - J2000; }
+function toJulian(date) {
+    return date.valueOf() / dayMs - 0.5 + J1970;
+}
+function fromJulian(j) {
+    return new Date((j + 0.5 - J1970) * dayMs);
+}
+function toDays(date) {
+    return toJulian(date) - J2000;
+}
 // general calculations for position
 const e = rad * 23.4397; // obliquity of the Earth
-function rightAscension(l, b) { return atan(sin(l) * cos(e) - tan(b) * sin(e), cos(l)); }
-function declination(l, b) { return asin(sin(b) * cos(e) + cos(b) * sin(e) * sin(l)); }
-function azimuth(H, phi, dec) { return atan(sin(H), cos(H) * sin(phi) - tan(dec) * cos(phi)); }
-function altitude(H, phi, dec) { return asin(sin(phi) * sin(dec) + cos(phi) * cos(dec) * cos(H)); }
-function siderealTime(d, lw) { return rad * (280.16 + 360.9856235 * d) - lw; }
+function rightAscension(l, b) {
+    return atan(sin(l) * cos(e) - tan(b) * sin(e), cos(l));
+}
+function declination(l, b) {
+    return asin(sin(b) * cos(e) + cos(b) * sin(e) * sin(l));
+}
+function azimuth(H, phi, dec) {
+    return atan(sin(H), cos(H) * sin(phi) - tan(dec) * cos(phi));
+}
+function altitude(H, phi, dec) {
+    return asin(sin(phi) * sin(dec) + cos(phi) * cos(dec) * cos(H));
+}
+function siderealTime(d, lw) {
+    return rad * (280.16 + 360.9856235 * d) - lw;
+}
 function astroRefraction(h) {
-    if (h < 0) // the following formula works for positive altitudes only.
+    if (h < 0)
+        // the following formula works for positive altitudes only.
         h = 0; // if h = -0.08901179 a div/0 would occur.
     // formula 16.4 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
     // 1.02 / tan(h + 10.26 / (h + 5.10)) h in degrees, result in arc minutes -> converted to rad:
     return 0.0002967 / Math.tan(h + 0.00312536 / (h + 0.08901179));
 }
 // general sun calculations
-function solarMeanAnomaly(d) { return rad * (357.5291 + 0.98560028 * d); }
+function solarMeanAnomaly(d) {
+    return rad * (357.5291 + 0.98560028 * d);
+}
 function eclipticLongitude(M) {
     const C = rad * (1.9148 * sin(M) + 0.02 * sin(2 * M) + 0.0003 * sin(3 * M)), // equation of center
     P = rad * 102.9372; // perihelion of the Earth
@@ -829,16 +997,26 @@ function sunCoords(d) {
     const M = solarMeanAnomaly(d), L = eclipticLongitude(M);
     return {
         dec: declination(L, 0),
-        ra: rightAscension(L, 0)
+        ra: rightAscension(L, 0),
     };
 }
 // calculations for sun times
 const J0 = 0.0009;
-function julianCycle(d, lw) { return Math.round(d - J0 - lw / (2 * PI)); }
-function approxTransit(Ht, lw, n) { return J0 + (Ht + lw) / (2 * PI) + n; }
-function solarTransitJ(ds, M, L) { return J2000 + ds + 0.0053 * sin(M) - 0.0069 * sin(2 * L); }
-function hourAngle(h, phi, d) { return acos((sin(h) - sin(phi) * sin(d)) / (cos(phi) * cos(d))); }
-function observerAngle(height) { return -2.076 * Math.sqrt(height) / 60; }
+function julianCycle(d, lw) {
+    return Math.round(d - J0 - lw / (2 * PI));
+}
+function approxTransit(Ht, lw, n) {
+    return J0 + (Ht + lw) / (2 * PI) + n;
+}
+function solarTransitJ(ds, M, L) {
+    return J2000 + ds + 0.0053 * sin(M) - 0.0069 * sin(2 * L);
+}
+function hourAngle(h, phi, d) {
+    return acos((sin(h) - sin(phi) * sin(d)) / (cos(phi) * cos(d)));
+}
+function observerAngle(height) {
+    return (-2.076 * Math.sqrt(height)) / 60;
+}
 // returns set time for the given sun altitude
 function getSetJ(h, lw, phi, dec, n, M, L) {
     const w = hourAngle(h, phi, dec), a = approxTransit(w, lw, n);
@@ -846,42 +1024,41 @@ function getSetJ(h, lw, phi, dec, n, M, L) {
 }
 // moon calculations, based on http://aa.quae.nl/en/reken/hemelpositie.html formulas
 function moonCoords(d) {
+    // geocentric ecliptic coordinates of the moon
     const L = rad * (218.316 + 13.176396 * d), // ecliptic longitude
     M = rad * (134.963 + 13.064993 * d), // mean anomaly
-    F = rad * (93.272 + 13.229350 * d), // mean distance
+    F = rad * (93.272 + 13.22935 * d), // mean distance
     l = L + rad * 6.289 * sin(M), // longitude
     b = rad * 5.128 * sin(F), // latitude
     dt = 385001 - 20905 * cos(M); // distance to the moon in km
     return {
         ra: rightAscension(l, b),
         dec: declination(l, b),
-        dist: dt
+        dist: dt,
     };
 }
 function hoursLater(date, h) {
-    return new Date(date.valueOf() + h * dayMs / 24);
+    return new Date(date.valueOf() + (h * dayMs) / 24);
 }
 class SunCalc {
-    constructor() {
-        // sun times configuration (angle, morning name, evening name)
-        this.times = [
-            [-0.833, 'sunrise', 'sunset'],
-            [-0.3, 'sunriseEnd', 'sunsetStart'],
-            [-6, 'dawn', 'dusk'],
-            [-12, 'nauticalDawn', 'nauticalDusk'],
-            [-18, 'nightEnd', 'night'],
-            [6, 'goldenHourEnd', 'goldenHour']
-        ];
-    }
     // calculates sun position for a given date and latitude/longitude
     // @ts-ignore: Unused method
     getPosition(date, lat, lng) {
         const lw = rad * -lng, phi = rad * lat, d = toDays(date), c = sunCoords(d), H = siderealTime(d, lw) - c.ra;
         return {
             azimuth: azimuth(H, phi, c.dec),
-            altitude: altitude(H, phi, c.dec)
+            altitude: altitude(H, phi, c.dec),
         };
     }
+    // sun times configuration (angle, morning name, evening name)
+    times = [
+        [-0.833, "sunrise", "sunset"],
+        [-0.3, "sunriseEnd", "sunsetStart"],
+        [-6, "dawn", "dusk"],
+        [-12, "nauticalDawn", "nauticalDusk"],
+        [-18, "nightEnd", "night"],
+        [6, "goldenHourEnd", "goldenHour"],
+    ];
     // adds a custom time to the times config
     // @ts-ignore: Unused method
     addTime(angle, riseName, setName) {
@@ -895,7 +1072,7 @@ class SunCalc {
         let i, len, time, h0, Jset, Jrise;
         const result = {
             solarNoon: fromJulian(Jnoon),
-            nadir: fromJulian(Jnoon - 0.5)
+            nadir: fromJulian(Jnoon - 0.5),
         };
         for (i = 0, len = this.times.length; i < len; i += 1) {
             time = this.times[i];
@@ -917,7 +1094,7 @@ class SunCalc {
             azimuth: azimuth(H, phi, c.dec),
             altitude: h,
             distance: c.dist,
-            parallacticAngle: pa
+            parallacticAngle: pa,
         };
     }
     // calculations for illumination parameters of the moon,
@@ -926,12 +1103,11 @@ class SunCalc {
     // @ts-ignore: Unused method
     getMoonIllumination(date) {
         const d = toDays(date || new Date()), s = sunCoords(d), m = moonCoords(d), sdist = 149598000, // distance from Earth to Sun in km
-        phi = acos(sin(s.dec) * sin(m.dec) + cos(s.dec) * cos(m.dec) * cos(s.ra - m.ra)), inc = atan(sdist * sin(phi), m.dist - sdist * cos(phi)), angle = atan(cos(s.dec) * sin(s.ra - m.ra), sin(s.dec) * cos(m.dec) -
-            cos(s.dec) * sin(m.dec) * cos(s.ra - m.ra));
+        phi = acos(sin(s.dec) * sin(m.dec) + cos(s.dec) * cos(m.dec) * cos(s.ra - m.ra)), inc = atan(sdist * sin(phi), m.dist - sdist * cos(phi)), angle = atan(cos(s.dec) * sin(s.ra - m.ra), sin(s.dec) * cos(m.dec) - cos(s.dec) * sin(m.dec) * cos(s.ra - m.ra));
         return {
             fraction: (1 + cos(inc)) / 2,
-            phase: 0.5 + 0.5 * inc * (angle < 0 ? -1 : 1) / Math.PI,
-            angle: angle
+            phase: 0.5 + (0.5 * inc * (angle < 0 ? -1 : 1)) / Math.PI,
+            angle: angle,
         };
     }
     // calculations for moon rise/set times are based on http://www.stargazing.net/kepler/moonrise.html article
@@ -986,7 +1162,7 @@ class SunCalc {
         if (set)
             result[set] = hoursLater(t, set);
         if (!rise && !set)
-            result[ye > 0 ? 'alwaysUp' : 'alwaysDown'] = true;
+            result[ye > 0 ? "alwaysUp" : "alwaysDown"] = true;
         return result;
     }
 }

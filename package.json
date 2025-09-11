@@ -1,14 +1,15 @@
 {
   "name": "zigbee2mqtt-automations",
-  "version": "2.0.5",
+  "version": "3.0.0",
   "description": "Automations extension for zigbee2mqtt",
   "author": "Luligu",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/Luligu/zigbee2mqtt-automations"
   },
   "keywords": [
+    "matterbridge",
     "bridge",
     "zigbee",
     "mqtt",
@@ -18,6 +19,7 @@
     "zigbee-herdsman-converters",
     "frontend",
     "automations",
+    "scenes",
     "extensions",
     "automation",
     "extension"
@@ -27,15 +29,16 @@
   },
   "homepage": "https://github.com/Luligu/zigbee2mqtt-automations#readme",
   "devDependencies": {
-    "@types/node": "^18.17.1",
-    "@typescript-eslint/eslint-plugin": "^6.8.0",
-    "@typescript-eslint/parser": "^6.8.0",
-    "eslint": "^8.51.0",
-    "typescript": "^5.0.4",
-    "zigbee2mqtt": "^1.33.1"
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2",
+    "zigbee2mqtt": "2.6.1"
   },
   "scripts": {
     "start": "tsc --watch",
-    "build": "tsc"
+    "build": "tsc",
+    "clean": "npx shx rm -rf tsconfig.tsbuildinfo dist coverage jest temp package-lock.json npm-shrinkwrap.json node_modules/* node_modules/.[!.]* node_modules/..?*",
+    "reset": "npm run clean && npm install && npm run build",
+    "checkDependencies": "npx npm-check-updates",
+    "updateDependencies": "npx npm-check-updates -u && npm run reset"
   }
 }

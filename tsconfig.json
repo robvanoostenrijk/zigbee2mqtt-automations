@@ -1,55 +1,17 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "module": "commonjs",
-    "lib": [
-      "es2020"
-    ],
-    "allowJs": false,
-    "checkJs": false,
-    "declaration": false,
-    "sourceMap": false,
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["esnext"],
     "outDir": "./dist/",
     "rootDir": "./src/",
-    "removeComments": false,
-    "downlevelIteration": true,
-    "isolatedModules": true,
+    "incremental": false,
+    "declaration": false,
+    "sourceMap": false,
     "skipLibCheck": true,
     "strict": true,
     "noImplicitAny": false,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "noImplicitThis": true,
-    "alwaysStrict": false,
-    "ignoreDeprecations": "5.0",
-    "types": [
-      "node"
-    ],
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "node",
-    "baseUrl": "./",
-    "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": true,
-    "strictPropertyInitialization": false,
   },
-  "watchOptions": {
-    "watchFile": "useFsEvents",
-    "watchDirectory": "useFsEvents",
-    "fallbackPolling": "dynamicPriority",
-    "synchronousWatchDirectory": true,
-    "excludeDirectories": [
-      "**/node_modules",
-      "dist"
-    ]
-  },
-  "include": [
-    "./src/"
-  ],
-  "exclude": [
-    "./node_modules/",
-    "./dist/"
-  ]
+  "include": ["src/**/*.ts"]
 }

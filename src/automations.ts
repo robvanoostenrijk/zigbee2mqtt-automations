@@ -1,75 +1,91 @@
 /**
- * This file contains the class AutomationsExtension and its definitions.
- *
+ * @description This file contains the class AutomationsExtension and its definitions.
  * @file automations.ts
- * @author Luligu (https://github.com/Luligu)
- * @copyright 2023, 2024, 2025 Luligu
- * @date 2023-10-15
+ * @author Luca Liguori
+ * @created 2023-10-15
+ * @version 3.0.0
+ * @license Apache-2.0
  *
- * See LICENSE in the root.
+ * Copyright 2023, 2024, 2025, 2026, 2027 Luca Liguori.
  *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable @typescript-eslint/no-var-requires */
 
-import { Buffer } from 'buffer';
+import { Buffer } from "buffer";
 
-import type Zigbee from 'zigbee2mqtt/dist/zigbee';
-import type MQTT from 'zigbee2mqtt/dist/mqtt';
-import type State from 'zigbee2mqtt/dist/state';
-import type Device from 'zigbee2mqtt/dist/model/device';
-import type Group from 'zigbee2mqtt/dist/model/device';
-import type EventBus from 'zigbee2mqtt/dist/eventBus';
-import type Extension from 'zigbee2mqtt/dist/extension/extension';
-import type Settings from 'zigbee2mqtt/dist/util/settings';
-import type Logger from 'zigbee2mqtt/dist/util/logger';
+import type Zigbee from "zigbee2mqtt/dist/zigbee.d.ts";
+import type MQTT from "zigbee2mqtt/dist/mqtt.d.ts";
+import type State from "zigbee2mqtt/dist/state.d.ts";
+import type Device from "zigbee2mqtt/dist/model/device.d.ts";
+import type Group from "zigbee2mqtt/dist/model/device.d.ts";
+import type EventBus from "zigbee2mqtt/dist/eventBus.d.ts";
+import type Extension from "zigbee2mqtt/dist/extension/extension.d.ts";
+import type Settings from "zigbee2mqtt/dist/util/settings.d.ts";
+import type Logger from "zigbee2mqtt/dist/util/logger.d.ts";
 
 // These packages are defined inside zigbee2mqtt and so they are not available here to import!
 // The external extensions are now loaded from a temp directory, we use require to load them from where we know they are
 const path = require("node:path");
 
-const utilPath = path.join(require.main?.path, "dist", "util")
+const utilPath = path.join(require.main?.path, "dist", "util");
 const joinPath = require(path.join(utilPath, "data")).default.joinPath;
 const readIfExists = require(path.join(utilPath, "yaml")).default.readIfExists;
 
-type StateChangeReason = "publishDebounce" | "groupOptimistic" | "lastSeenChanged" | "publishCached" | "publishThrottle";
+type StateChangeReason =
+  | "publishDebounce"
+  | "groupOptimistic"
+  | "lastSeenChanged"
+  | "publishCached"
+  | "publishThrottle";
 
 function toArray<T>(item: T | T[]): T[] {
   return Array.isArray(item) ? item : [item];
 }
 
 enum ConfigSunCalc {
-  SOLAR_NOON = 'solarNoon',
-  NADIR = 'nadir',
-  SUNRISE = 'sunrise',
-  SUNSET = 'sunset',
-  SUNRISE_END = 'sunriseEnd',
-  SUNSET_START = 'sunsetStart',
-  DAWN = 'dawn',
-  DUSK = 'dusk',
-  NAUTICAL_DAWN = 'nauticalDawn',
-  NAUTICAL_DUSK = 'nauticalDusk',
-  NIGHT_END = 'nightEnd',
-  NIGHT = 'night',
-  GOLDEN_HOUR_END = 'goldenHourEnd',
-  GOLDEN_HOUR = 'goldenHour',
+  SOLAR_NOON = "solarNoon",
+  NADIR = "nadir",
+  SUNRISE = "sunrise",
+  SUNSET = "sunset",
+  SUNRISE_END = "sunriseEnd",
+  SUNSET_START = "sunsetStart",
+  DAWN = "dawn",
+  DUSK = "dusk",
+  NAUTICAL_DAWN = "nauticalDawn",
+  NAUTICAL_DUSK = "nauticalDusk",
+  NIGHT_END = "nightEnd",
+  NIGHT = "night",
+  GOLDEN_HOUR_END = "goldenHourEnd",
+  GOLDEN_HOUR = "goldenHour",
 }
 
 enum ConfigState {
-  ON = 'ON',
-  OFF = 'OFF',
-  TOGGLE = 'TOGGLE',
+  ON = "ON",
+  OFF = "OFF",
+  TOGGLE = "TOGGLE",
 }
 
 enum ConfigPayload {
-  TOGGLE = 'toggle',
-  TURN_ON = 'turn_on',
-  TURN_OFF = 'turn_off',
+  TOGGLE = "toggle",
+  TURN_ON = "turn_on",
+  TURN_OFF = "turn_off",
 }
 
 enum MessagePayload {
-  EXECUTE = 'execute'
+  EXECUTE = "execute",
 }
 
 type ConfigStateType = string;
@@ -133,15 +149,17 @@ interface ConfigAttributeTrigger extends ConfigEventTrigger {
 type ConfigActionPayload = Record<ConfigAttributeType, ConfigPayloadType>;
 
 interface ConfigAction {
-  entity: EntityId;
-  payload: ConfigActionPayload;
+  // entity type action
+  entity?: EntityId;
+  payload?: ConfigActionPayload;
   payload_off?: ConfigActionPayload;
   turn_off_after?: TurnOffAfterType;
   logger?: LoggerType;
+  // scene type action
+  scene?: SceneId; // scene name
 }
 
-interface ConfigCondition {
-}
+interface ConfigCondition {}
 
 interface ConfigEntityCondition extends ConfigCondition {
   entity: EntityId;
@@ -160,107 +178,144 @@ interface ConfigTimeCondition extends ConfigCondition {
   weekday?: string[];
 }
 
+interface ConfigSceneAction {
+  entity: EntityId;
+  payload: ConfigActionPayload;
+  logger?: LoggerType;
+  scene?: SceneId; // scene name
+}
+
+// Yaml defined scenes
+type ConfigScenes = {
+  [key: string]: ConfigSceneAction | ConfigSceneAction[];
+};
+
 // Yaml defined automations
 type ConfigAutomations = {
   [key: string]: {
     execute_once?: ExecuteOnceType;
-    active?: ActiveType,
-    trigger: ConfigTrigger | ConfigTrigger[],
-    action: ConfigAction | ConfigAction[],
-    condition?: ConfigCondition | ConfigCondition[],
-  }
+    active?: ActiveType;
+    trigger: ConfigTrigger | ConfigTrigger[];
+    action: ConfigAction | ConfigAction[];
+    condition?: ConfigCondition | ConfigCondition[];
+  };
 };
 
 // Internal event based automations
 type EventAutomation = {
-  name: string,
+  name: string;
   execute_once?: ExecuteOnceType;
-  trigger: ConfigEventTrigger,
-  condition: ConfigCondition[],
-  action: ConfigAction[],
+  trigger: ConfigEventTrigger;
+  condition: ConfigCondition[];
+  action: ConfigAction[];
 };
 
 type EntityId = string;
+type SceneId = string;
 
 type EventAutomations = {
-  [key: EntityId]: EventAutomation[],
+  [key: EntityId]: EventAutomation[];
 };
 
 // Internal time based automations
 type TimeAutomation = {
-  name: string,
+  name: string;
   execute_once?: ExecuteOnceType;
-  trigger: ConfigTimeTrigger,
-  condition: ConfigCondition[],
-  action: ConfigAction[],
+  trigger: ConfigTimeTrigger;
+  condition: ConfigCondition[];
+  action: ConfigAction[];
 };
 
 type TimeId = string;
 
 type TimeAutomations = {
-  [key: TimeId]: TimeAutomation[],
+  [key: TimeId]: TimeAutomation[];
 };
 
 type MQTTMessage = {
-  topic: string,
-  message: string
-}
+  topic: string;
+  message: string;
+};
 
 class InternalLogger {
-  constructor() { }
+  constructor() {}
 
   debug(message: string, ...args: unknown[]): void {
-    console.log(`\x1b[46m\x1b[97m[Automations]\x1b[0m \x1b[38;5;247m${message}\x1b[0m`, ...args);
+    console.log(
+      `\x1b[46m\x1b[97m[Automations]\x1b[0m \x1b[38;5;247m${message}\x1b[0m`,
+      ...args
+    );
   }
 
   warning(message: string, ...args: unknown[]): void {
-    console.log(`\x1b[46m\x1b[97m[Automations]\x1b[0m \x1b[38;5;220m${message}\x1b[0m`, ...args);
+    console.log(
+      `\x1b[46m\x1b[97m[Automations]\x1b[0m \x1b[38;5;220m${message}\x1b[0m`,
+      ...args
+    );
   }
 
   info(message: string, ...args: unknown[]): void {
-    console.log(`\x1b[46m\x1b[97m[Automations]\x1b[0m \x1b[38;5;255m${message}\x1b[0m`, ...args);
+    console.log(
+      `\x1b[46m\x1b[97m[Automations]\x1b[0m \x1b[38;5;255m${message}\x1b[0m`,
+      ...args
+    );
   }
 
   error(message: string, ...args: unknown[]): void {
-    console.log(`\x1b[46m\x1b[97m[Automations]\x1b[0m \x1b[38;5;9m${message}\x1b[0m`, ...args);
+    console.log(
+      `\x1b[46m\x1b[97m[Automations]\x1b[0m \x1b[38;5;9m${message}\x1b[0m`,
+      ...args
+    );
   }
 }
 
 class AutomationsExtension {
   private readonly mqttBaseTopic: string;
   private readonly automationsTopic: string;
-  private readonly topicRegex: RegExp;
+  private readonly scenesTopic: string;
+  private readonly automationsTopicRegex: RegExp;
+  private readonly scenesTopicRegex: RegExp;
+  private scenes: ConfigScenes = {};
   private readonly eventAutomations: EventAutomations = {};
   private timeAutomations: TimeAutomations = {};
   private readonly triggerForTimeouts: Record<string, NodeJS.Timeout>;
   private readonly turnOffAfterTimeouts: Record<string, NodeJS.Timeout>;
-  private midnightTimeout: NodeJS.Timeout;
+  private midnightTimeout: NodeJS.Timeout | undefined;
   private readonly log: InternalLogger;
 
   constructor(
     protected zigbee: Zigbee,
     protected mqtt: MQTT,
     protected state: State,
-    protected publishEntityState: (entity: Device | Group, payload: Record<string, unknown>, stateChangeReason?: StateChangeReason) => Promise<void>,
+    protected publishEntityState: (
+      entity: Device | Group,
+      payload: Record<string, unknown>,
+      stateChangeReason?: StateChangeReason
+    ) => Promise<void>,
     protected eventBus: EventBus,
-    protected enableDisableExtension: (enable: boolean, name: string) => Promise<void>,
+    protected enableDisableExtension: (
+      enable: boolean,
+      name: string
+    ) => Promise<void>,
     protected restartCallback: () => Promise<void>,
     protected addExtension: (extension: Extension) => Promise<void>,
     protected settings: typeof Settings,
-    protected logger: typeof Logger,
+    protected logger: typeof Logger
   ) {
     this.log = new InternalLogger();
     this.mqttBaseTopic = settings.get().mqtt.base_topic;
     this.triggerForTimeouts = {};
     this.turnOffAfterTimeouts = {};
-    this.automationsTopic = 'zigbee2mqtt-automations';
+    this.automationsTopic = "zigbee2mqtt-automations";
+    this.scenesTopic = "zigbee2mqtt-scenes";
     // eslint-disable-next-line no-useless-escape
-    this.topicRegex = new RegExp(`^${this.automationsTopic}\/(.*)`);
+    this.automationsTopicRegex = new RegExp(`^${this.automationsTopic}\/(.*)`);
+    // eslint-disable-next-line no-useless-escape
+    this.scenesTopicRegex = new RegExp(`^${this.scenesTopic}\/(.*)`);
 
     this.logger.info(`[Automations] Loading automation.js`);
 
-    if (!this.parseConfig())
-      return;
+    if (!this.parseConfig()) return;
 
     /*
     this.log.info(`Event automation:`);
@@ -272,9 +327,9 @@ class AutomationsExtension {
     });
     */
     //this.log.info(`Time automation:`);
-    Object.keys(this.timeAutomations).forEach(key => {
+    Object.keys(this.timeAutomations).forEach((key) => {
       const timeAutomationArray = this.timeAutomations[key];
-      timeAutomationArray.forEach(timeAutomation => {
+      timeAutomationArray.forEach((timeAutomation) => {
         //this.log.info(`- key: #${key}# automation: ${this.stringify(timeAutomation, true)}`);
         this.startTimeTriggers(key, timeAutomation);
       });
@@ -286,69 +341,142 @@ class AutomationsExtension {
   }
 
   private parseConfig(): boolean {
+    let configScenes: ConfigScenes = {};
+    try {
+      configScenes = readIfExists(joinPath("scenes.yaml")) || {};
+      this.scenes = configScenes;
+      Object.entries(this.scenes).forEach(([key, configScene]) => {
+        const actions = toArray(configScene);
+        this.logger.info(`[Scenes] Registering scene [${key}]`);
+        for (const action of actions) {
+          if (action.entity) {
+            if (!this.zigbee.resolveEntity(action.entity)) {
+              this.logger.error(
+                `[Scenes] Config validation error for [${key}]: entity #${action.entity}# not found`
+              );
+            }
+            if (!action.payload) {
+              this.logger.error(
+                `[Scenes] Config validation error for [${key}]: entity #${action.entity}# payload not found`
+              );
+            }
+          } else if (action.scene) {
+            this.logger.info(`[Scenes] - scene #${action.scene}#`);
+          }
+        }
+      });
+    } catch (error) {
+      this.logger.info(
+        `[Automations] Error loading file scenes.yaml: see stderr for explanation`
+      );
+    }
+
     let configAutomations: ConfigAutomations = {};
     try {
       // configAutomations = (yaml.readIfExists(data.joinPath('automations.yaml')) || {}) as ConfigAutomations;
-      configAutomations = (readIfExists(joinPath('automations.yaml')) || {}) as ConfigAutomations;
-    }
-    catch (error) {
-      this.logger.error(`[Automations] Error loading file automations.yaml: see stderr for explanation`);
+      configAutomations = (readIfExists(joinPath("automations.yaml")) ||
+        {}) as ConfigAutomations;
+    } catch (error) {
+      this.logger.error(
+        `[Automations] Error loading file automations.yaml: see stderr for explanation`
+      );
       console.log(error);
       return false;
     }
 
     Object.entries(configAutomations).forEach(([key, configAutomation]) => {
       const actions = toArray(configAutomation.action);
-      const conditions = configAutomation.condition ? toArray(configAutomation.condition) : [];
+      const conditions = configAutomation.condition
+        ? toArray(configAutomation.condition)
+        : [];
       const triggers = toArray(configAutomation.trigger);
 
       // Check automation
       if (configAutomation.active === false) {
-        this.logger.info(`[Automations] Automation [${key}] not registered since active is false`);
+        this.logger.info(
+          `[Automations] Automation [${key}] not registered since active is false`
+        );
         return;
       }
       if (!configAutomation.trigger) {
-        this.logger.error(`[Automations] Config validation error for [${key}]: no triggers defined`);
+        this.logger.error(
+          `[Automations] Config validation error for [${key}]: no triggers defined`
+        );
         return;
       }
       if (!configAutomation.action) {
-        this.logger.error(`[Automations] Config validation error for [${key}]: no actions defined`);
+        this.logger.error(
+          `[Automations] Config validation error for [${key}]: no actions defined`
+        );
         return;
       }
       // Check triggers
       for (const trigger of triggers) {
         if (!trigger.time && !trigger.entity) {
-          this.logger.error(`[Automations] Config validation error for [${key}]: trigger entity not defined`);
+          this.logger.error(
+            `[Automations] Config validation error for [${key}]: trigger entity not defined`
+          );
           return;
         }
         if (!trigger.time && !this.zigbee.resolveEntity(trigger.entity)) {
-          this.logger.error(`[Automations] Config validation error for [${key}]: trigger entity #${trigger.entity}# not found`);
+          this.logger.error(
+            `[Automations] Config validation error for [${key}]: trigger entity #${trigger.entity}# not found`
+          );
           return;
         }
       }
       // Check actions
       for (const action of actions) {
-        if (!action.entity) {
-          this.logger.error(`[Automations] Config validation error for [${key}]: action entity not defined`);
+        if (!action.entity && !action.scene) {
+          this.logger.error(
+            `[Automations] Config validation error for [${key}]: action entity or action scene not defined`
+          );
           return;
         }
-        if (!this.zigbee.resolveEntity(action.entity)) {
-          this.logger.error(`[Automations] Config validation error for [${key}]: action entity #${action.entity}# not found`);
+        if (action.entity && !this.zigbee.resolveEntity(action.entity)) {
+          this.logger.error(
+            `[Automations] Config validation error for [${key}]: action entity #${action.entity}# not found`
+          );
           return;
         }
-        if (!action.payload) {
-          this.logger.error(`[Automations] Config validation error for [${key}]: action payload not defined`);
+        if (action.entity && !action.payload) {
+          this.logger.error(
+            `[Automations] Config validation error for [${key}]: action payload not defined`
+          );
+          return;
+        }
+        if (action.scene && !this.scenes[action.scene]) {
+          this.logger.error(
+            `[Automations] Config validation error for [${key}]: action scene #${action.scene}# not found`
+          );
           return;
         }
       }
       // Check conditions
       for (const condition of conditions) {
-        if (!(condition as ConfigEntityCondition).entity && !(condition as ConfigTimeCondition).after && !(condition as ConfigTimeCondition).before && !(condition as ConfigTimeCondition).between && !(condition as ConfigTimeCondition).weekday) {
-          this.logger.error(`[Automations] Config validation error for [${key}]: condition unknown`);
+        if (
+          !(condition as ConfigEntityCondition).entity &&
+          !(condition as ConfigTimeCondition).after &&
+          !(condition as ConfigTimeCondition).before &&
+          !(condition as ConfigTimeCondition).between &&
+          !(condition as ConfigTimeCondition).weekday
+        ) {
+          this.logger.error(
+            `[Automations] Config validation error for [${key}]: condition unknown`
+          );
           return;
         }
-        if ((condition as ConfigEntityCondition).entity && !this.zigbee.resolveEntity((condition as ConfigEntityCondition).entity)) {
-          this.logger.error(`[Automations] Config validation error for [${key}]: condition entity #${(condition as ConfigEntityCondition).entity}# not found`);
+        if (
+          (condition as ConfigEntityCondition).entity &&
+          !this.zigbee.resolveEntity(
+            (condition as ConfigEntityCondition).entity
+          )
+        ) {
+          this.logger.error(
+            `[Automations] Config validation error for [${key}]: condition entity #${
+              (condition as ConfigEntityCondition).entity
+            }# not found`
+          );
           return;
         }
       }
@@ -356,45 +484,104 @@ class AutomationsExtension {
       for (const trigger of triggers) {
         if (trigger.time !== undefined) {
           const timeTrigger = trigger as ConfigTimeTrigger;
-          this.logger.info(`[Automations] Registering time automation [${key}] trigger: ${timeTrigger.time}`);
+          this.logger.info(
+            `[Automations] Registering time automation [${key}] trigger: ${timeTrigger.time}`
+          );
           const suncalcs = Object.values(ConfigSunCalc);
           if (suncalcs.includes(timeTrigger.time as ConfigSunCalc)) {
             if (!timeTrigger.latitude || !timeTrigger.longitude) {
-              this.logger.error(`[Automations] Config validation error for [${key}]: latitude and longitude are mandatory for ${trigger.time}`);
+              this.logger.error(
+                `[Automations] Config validation error for [${key}]: latitude and longitude are mandatory for ${trigger.time}`
+              );
               return;
             }
             const suncalc = new SunCalc();
-            const times = suncalc.getTimes(new Date(), timeTrigger.latitude, timeTrigger.longitude, timeTrigger.elevation ? timeTrigger.elevation : 0) as object;
-            this.logger.debug(`[Automations] Sunrise at ${times[ConfigSunCalc.SUNRISE].toLocaleTimeString()} sunset at ${times[ConfigSunCalc.SUNSET].toLocaleTimeString()} for latitude:${timeTrigger.latitude} longitude:${timeTrigger.longitude} elevation:${timeTrigger.elevation ? timeTrigger.elevation : 0}`);
-            this.log.debug(`[Automations] For latitude:${timeTrigger.latitude} longitude:${timeTrigger.longitude} elevation:${timeTrigger.elevation ? timeTrigger.elevation : 0} suncalc are:\n`, times);
-            const options = { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
-            const time = times[trigger.time].toLocaleTimeString('en-GB', options);
-            this.log.debug(`[Automations] Registering time automation [${key}] trigger: ${time}`);
-            if (!this.timeAutomations[time])
-              this.timeAutomations[time] = [];
-            this.timeAutomations[time].push({ name: key, execute_once: configAutomation.execute_once, trigger: timeTrigger, action: actions, condition: conditions });
+            const times = suncalc.getTimes(
+              new Date(),
+              timeTrigger.latitude,
+              timeTrigger.longitude,
+              timeTrigger.elevation ? timeTrigger.elevation : 0
+            ) as object;
+            this.logger.debug(
+              `[Automations] Sunrise at ${times[
+                ConfigSunCalc.SUNRISE
+              ].toLocaleTimeString()} sunset at ${times[
+                ConfigSunCalc.SUNSET
+              ].toLocaleTimeString()} for latitude:${
+                timeTrigger.latitude
+              } longitude:${timeTrigger.longitude} elevation:${
+                timeTrigger.elevation ? timeTrigger.elevation : 0
+              }`
+            );
+            this.log.debug(
+              `[Automations] For latitude:${timeTrigger.latitude} longitude:${
+                timeTrigger.longitude
+              } elevation:${
+                timeTrigger.elevation ? timeTrigger.elevation : 0
+              } suncalc are:\n`,
+              times
+            );
+            const options = {
+              hour12: false,
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            };
+            const time = times[trigger.time].toLocaleTimeString(
+              "en-GB",
+              options
+            );
+            this.log.debug(
+              `[Automations] Registering time automation [${key}] trigger: ${time}`
+            );
+            if (!this.timeAutomations[time]) this.timeAutomations[time] = [];
+            this.timeAutomations[time].push({
+              name: key,
+              execute_once: configAutomation.execute_once,
+              trigger: timeTrigger,
+              action: actions,
+              condition: conditions,
+            });
           } else if (this.matchTimeString(timeTrigger.time)) {
             if (!this.timeAutomations[timeTrigger.time])
               this.timeAutomations[timeTrigger.time] = [];
-            this.timeAutomations[timeTrigger.time].push({ name: key, execute_once: configAutomation.execute_once, trigger: timeTrigger, action: actions, condition: conditions });
+            this.timeAutomations[timeTrigger.time].push({
+              name: key,
+              execute_once: configAutomation.execute_once,
+              trigger: timeTrigger,
+              action: actions,
+              condition: conditions,
+            });
           } else {
-            this.logger.error(`[Automations] Config validation error for [${key}]: time syntax error for ${trigger.time}`);
+            this.logger.error(
+              `[Automations] Config validation error for [${key}]: time syntax error for ${trigger.time}`
+            );
             return;
           }
         }
         if (trigger.entity !== undefined) {
           const eventTrigger = trigger as ConfigEventTrigger;
           if (!this.zigbee.resolveEntity(eventTrigger.entity)) {
-            this.logger.error(`[Automations] Config validation error for [${key}]: trigger entity #${eventTrigger.entity}# not found`);
+            this.logger.error(
+              `[Automations] Config validation error for [${key}]: trigger entity #${eventTrigger.entity}# not found`
+            );
             return;
           }
-          this.logger.info(`[Automations] Registering event automation [${key}] trigger: entity #${eventTrigger.entity}#`);
+          this.logger.info(
+            `[Automations] Registering event automation [${key}] trigger: entity #${eventTrigger.entity}#`
+          );
           const entities = toArray(eventTrigger.entity);
           for (const entity of entities) {
             if (!this.eventAutomations[entity]) {
               this.eventAutomations[entity] = [];
             }
-            this.eventAutomations[entity].push({ name: key, execute_once: configAutomation.execute_once, trigger: eventTrigger, action: actions, condition: conditions });
+            this.eventAutomations[entity].push({
+              name: key,
+              execute_once: configAutomation.execute_once,
+              trigger: eventTrigger,
+              action: actions,
+              condition: conditions,
+            });
           }
         }
       } // for (const trigger of triggers)
@@ -406,10 +593,14 @@ class AutomationsExtension {
    * Check a time string and return a Date or undefined if error
    */
   private matchTimeString(timeString: TimeStringType): Date | undefined {
-    if (timeString.length !== 8)
-      return undefined;
+    if (timeString.length !== 8) return undefined;
     const match = timeString.match(/(\d{2}):(\d{2}):(\d{2})/);
-    if (match && parseInt(match[1], 10) <= 23 && parseInt(match[2], 10) <= 59 && parseInt(match[3], 10) <= 59) {
+    if (
+      match &&
+      parseInt(match[1], 10) <= 23 &&
+      parseInt(match[2], 10) <= 59 &&
+      parseInt(match[3], 10) <= 59
+    ) {
       const time = new Date();
       time.setHours(parseInt(match[1], 10));
       time.setMinutes(parseInt(match[2], 10));
@@ -430,34 +621,61 @@ class AutomationsExtension {
     timeEvent.setHours(23);
     timeEvent.setMinutes(59);
     timeEvent.setSeconds(59);
-    this.logger.debug(`[Automations] Set timeout to reload for time automations`);
+    this.logger.debug(
+      `[Automations] Set timeout to reload for time automations`
+    );
     this.midnightTimeout = setTimeout(() => {
       this.logger.info(`[Automations] Run timeout to reload time automations`);
 
       const newTimeAutomations = {};
       const suncalcs = Object.values(ConfigSunCalc);
-      Object.keys(this.timeAutomations).forEach(key => {
+      Object.keys(this.timeAutomations).forEach((key) => {
         const timeAutomationArray = this.timeAutomations[key];
-        timeAutomationArray.forEach(timeAutomation => {
-            if(suncalcs.includes(timeAutomation.trigger.time as ConfigSunCalc)) {
-              if (!timeAutomation.trigger.latitude || !timeAutomation.trigger.longitude) return;
-              const suncalc = new SunCalc();
-              const times = suncalc.getTimes(new Date(), timeAutomation.trigger.latitude, timeAutomation.trigger.longitude, timeAutomation.trigger.elevation ?? 0);
-              // this.log.info(`Key:[${key}] For latitude:${timeAutomation.trigger.latitude} longitude:${timeAutomation.trigger.longitude} elevation:${timeAutomation.trigger.elevation ?? 0} suncalcs are:\n`, times);
-              const options = { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
-              const time = times[timeAutomation.trigger.time].toLocaleTimeString('en-GB', options);
-              // this.log.info(`Registering suncalc time automation at time [${time}] for:`, timeAutomation);                   
-              this.logger.info(`[Automations] Registering suncalc time automation at time [${time}] for: ${this.stringify(timeAutomation)}`);
-              if (!newTimeAutomations[time]) newTimeAutomations[time] = [];
-              newTimeAutomations[time].push(timeAutomation);
-              this.startTimeTriggers(time, timeAutomation);
-            } else {
-              // this.log.info(`Registering normal time automation at time [${key}] for:`, timeAutomation);
-              this.logger.info(`[Automations] Registering normal time automation at time [${key}] for: ${this.stringify(timeAutomation)}`);
-              if (!newTimeAutomations[key]) newTimeAutomations[key] = [];
-              newTimeAutomations[key].push(timeAutomation);
-              this.startTimeTriggers(key, timeAutomation);
-            }
+        timeAutomationArray.forEach((timeAutomation) => {
+          if (suncalcs.includes(timeAutomation.trigger.time as ConfigSunCalc)) {
+            if (
+              !timeAutomation.trigger.latitude ||
+              !timeAutomation.trigger.longitude
+            )
+              return;
+            const suncalc = new SunCalc();
+            const times = suncalc.getTimes(
+              new Date(),
+              timeAutomation.trigger.latitude,
+              timeAutomation.trigger.longitude,
+              timeAutomation.trigger.elevation ?? 0
+            );
+            // this.log.info(`Key:[${key}] For latitude:${timeAutomation.trigger.latitude} longitude:${timeAutomation.trigger.longitude} elevation:${timeAutomation.trigger.elevation ?? 0} suncalcs are:\n`, times);
+            const options = {
+              hour12: false,
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            };
+            const time = times[timeAutomation.trigger.time].toLocaleTimeString(
+              "en-GB",
+              options
+            );
+            // this.log.info(`Registering suncalc time automation at time [${time}] for:`, timeAutomation);
+            this.logger.info(
+              `[Automations] Registering suncalc time automation at time [${time}] for: ${this.stringify(
+                timeAutomation
+              )}`
+            );
+            if (!newTimeAutomations[time]) newTimeAutomations[time] = [];
+            newTimeAutomations[time].push(timeAutomation);
+            this.startTimeTriggers(time, timeAutomation);
+          } else {
+            // this.log.info(`Registering normal time automation at time [${key}] for:`, timeAutomation);
+            this.logger.info(
+              `[Automations] Registering normal time automation at time [${key}] for: ${this.stringify(
+                timeAutomation
+              )}`
+            );
+            if (!newTimeAutomations[key]) newTimeAutomations[key] = [];
+            newTimeAutomations[key].push(timeAutomation);
+            this.startTimeTriggers(key, timeAutomation);
+          }
         });
       });
       this.timeAutomations = newTimeAutomations;
@@ -478,20 +696,33 @@ class AutomationsExtension {
     const timeEvent = this.matchTimeString(key);
     if (timeEvent !== undefined) {
       if (timeEvent.getTime() > now.getTime()) {
-        this.logger.debug(`[Automations] Set timeout at ${timeEvent.toLocaleString()} for [${automation.name}]`);
+        this.logger.debug(
+          `[Automations] Set timeout at ${timeEvent.toLocaleString()} for [${
+            automation.name
+          }]`
+        );
         const timeout = setTimeout(() => {
           delete this.triggerForTimeouts[automation.name];
           this.logger.debug(`[Automations] Timeout for [${automation.name}]`);
-          this.runActionsWithConditions(automation, automation.condition, automation.action);
+          this.runActionsWithConditions(
+            automation,
+            automation.condition,
+            automation.action
+          );
         }, timeEvent.getTime() - now.getTime());
         timeout.unref();
         this.triggerForTimeouts[automation.name] = timeout;
-      }
-      else {
-        this.logger.debug(`[Automations] Timeout at ${timeEvent.toLocaleString()} is passed for [${automation.name}]`);
+      } else {
+        this.logger.debug(
+          `[Automations] Timeout at ${timeEvent.toLocaleString()} is passed for [${
+            automation.name
+          }]`
+        );
       }
     } else {
-      this.logger.error(`[Automations] Timeout config error at ${key} for [${automation.name}]`);
+      this.logger.error(
+        `[Automations] Timeout config error at ${key} for [${automation.name}]`
+      );
     }
   }
 
@@ -500,7 +731,13 @@ class AutomationsExtension {
    * false - return and stop timer
    * true - start the automation
    */
-  private checkTrigger(automation: EventAutomation, configTrigger: ConfigEventTrigger, update: StateChangeUpdate, from: StateChangeFrom, to: StateChangeTo): boolean | null {
+  private checkTrigger(
+    automation: EventAutomation,
+    configTrigger: ConfigEventTrigger,
+    update: StateChangeUpdate,
+    from: StateChangeFrom,
+    to: StateChangeTo
+  ): boolean | null {
     let trigger;
     let attribute;
     let result;
@@ -509,211 +746,373 @@ class AutomationsExtension {
     //this.log.warning(`[Automations] Trigger check [${automation.name}] update: ${this.stringify(update)} from: ${this.stringify(from)} to: ${this.stringify(to)}`);
 
     if (configTrigger.action !== undefined) {
-      if (!Object.prototype.hasOwnProperty.call(update, 'action')) {
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] no 'action' in update for #${configTrigger.entity}#`);
+      if (!Object.prototype.hasOwnProperty.call(update, "action")) {
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] no 'action' in update for #${configTrigger.entity}#`
+        );
         return null;
       }
       trigger = configTrigger as ConfigActionTrigger;
       actions = toArray(trigger.action);
       result = actions.includes(update.action as ConfigActionType);
-      this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger is ${result} for #${configTrigger.entity}# action(s): ${this.stringify(actions)}`);
+      this.logger.debug(
+        `[Automations] Trigger check [${
+          automation.name
+        }] trigger is ${result} for #${
+          configTrigger.entity
+        }# action(s): ${this.stringify(actions)}`
+      );
       return result;
     } else if (configTrigger.attribute !== undefined) {
       trigger = configTrigger as ConfigAttributeTrigger;
       attribute = trigger.attribute;
-      if (!Object.prototype.hasOwnProperty.call(update, attribute) || !Object.prototype.hasOwnProperty.call(to, attribute)) {
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' published for #${configTrigger.entity}#`);
+      if (
+        !Object.prototype.hasOwnProperty.call(update, attribute) ||
+        !Object.prototype.hasOwnProperty.call(to, attribute)
+      ) {
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] no '${attribute}' published for #${configTrigger.entity}#`
+        );
         return null;
       }
       if (from[attribute] === to[attribute]) {
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' change for #${configTrigger.entity}#`);
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] no '${attribute}' change for #${configTrigger.entity}#`
+        );
         return null;
       }
 
-      if (typeof trigger.equal !== 'undefined' || typeof trigger.state !== 'undefined') {
-        const value = trigger.state !== undefined ? trigger.state : trigger.equal;
+      if (
+        typeof trigger.equal !== "undefined" ||
+        typeof trigger.state !== "undefined"
+      ) {
+        const value =
+          trigger.state !== undefined ? trigger.state : trigger.equal;
         if (to[attribute] !== value) {
-          this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' != ${value} for #${configTrigger.entity}#`);
+          this.logger.debug(
+            `[Automations] Trigger check [${automation.name}] '${attribute}' != ${value} for #${configTrigger.entity}#`
+          );
           return false;
         }
         if (from[attribute] === value) {
-          this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' already = ${value} for #${configTrigger.entity}#`);
+          this.logger.debug(
+            `[Automations] Trigger check [${automation.name}] '${attribute}' already = ${value} for #${configTrigger.entity}#`
+          );
           return null;
         }
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger equal/state ${value} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] trigger equal/state ${value} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `
+        );
       }
 
-      if (typeof trigger.not_equal !== 'undefined') {
+      if (typeof trigger.not_equal !== "undefined") {
         if (to[attribute] === trigger.not_equal) {
-          this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' = ${trigger.not_equal} for #${configTrigger.entity}#`);
+          this.logger.debug(
+            `[Automations] Trigger check [${automation.name}] '${attribute}' = ${trigger.not_equal} for #${configTrigger.entity}#`
+          );
           return false;
         }
         if (from[attribute] !== trigger.not_equal) {
-          this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' already != ${trigger.not_equal} for #${configTrigger.entity}#`);
+          this.logger.debug(
+            `[Automations] Trigger check [${automation.name}] '${attribute}' already != ${trigger.not_equal} for #${configTrigger.entity}#`
+          );
           return null;
         }
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger not equal ${trigger.not_equal} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] trigger not equal ${trigger.not_equal} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `
+        );
       }
 
-      if (typeof trigger.above !== 'undefined') {
+      if (typeof trigger.above !== "undefined") {
         if (to[attribute] <= trigger.above) {
-          this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' <= ${trigger.above} for #${configTrigger.entity}#`);
+          this.logger.debug(
+            `[Automations] Trigger check [${automation.name}] '${attribute}' <= ${trigger.above} for #${configTrigger.entity}#`
+          );
           return false;
         }
         if (from[attribute] > trigger.above) {
-          this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' already > ${trigger.above} for #${configTrigger.entity}#`);
+          this.logger.debug(
+            `[Automations] Trigger check [${automation.name}] '${attribute}' already > ${trigger.above} for #${configTrigger.entity}#`
+          );
           return null;
         }
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger above ${trigger.above} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] trigger above ${trigger.above} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `
+        );
       }
 
-      if (typeof trigger.below !== 'undefined') {
+      if (typeof trigger.below !== "undefined") {
         if (to[attribute] >= trigger.below) {
-          this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' >= ${trigger.below} for #${configTrigger.entity}#`);
+          this.logger.debug(
+            `[Automations] Trigger check [${automation.name}] '${attribute}' >= ${trigger.below} for #${configTrigger.entity}#`
+          );
           return false;
         }
         if (from[attribute] < trigger.below) {
-          this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' already < ${trigger.below} for #${configTrigger.entity}#`);
+          this.logger.debug(
+            `[Automations] Trigger check [${automation.name}] '${attribute}' already < ${trigger.below} for #${configTrigger.entity}#`
+          );
           return null;
         }
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger below ${trigger.below} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `);
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] trigger below ${trigger.below} is true for #${configTrigger.entity}# ${attribute} is ${to[attribute]} `
+        );
       }
       return true;
     } else if (configTrigger.state !== undefined) {
       trigger = configTrigger as ConfigStateTrigger;
-      attribute = 'state';
-      if (!Object.prototype.hasOwnProperty.call(update, attribute) || !Object.prototype.hasOwnProperty.call(to, attribute)) {
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' published for #${configTrigger.entity}#`);
+      attribute = "state";
+      if (
+        !Object.prototype.hasOwnProperty.call(update, attribute) ||
+        !Object.prototype.hasOwnProperty.call(to, attribute)
+      ) {
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] no '${attribute}' published for #${configTrigger.entity}#`
+        );
         return null;
       }
       if (from[attribute] === to[attribute]) {
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] no '${attribute}' change for #${configTrigger.entity}#`);
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] no '${attribute}' change for #${configTrigger.entity}#`
+        );
         return null;
       }
       if (to[attribute] !== trigger.state) {
-        this.logger.debug(`[Automations] Trigger check [${automation.name}] '${attribute}' != ${trigger.state} for #${configTrigger.entity}#`);
+        this.logger.debug(
+          `[Automations] Trigger check [${automation.name}] '${attribute}' != ${trigger.state} for #${configTrigger.entity}#`
+        );
         return null;
       }
-      this.logger.debug(`[Automations] Trigger check [${automation.name}] trigger state ${trigger.state} is true for #${configTrigger.entity}# state is ${to[attribute]}`);
+      this.logger.debug(
+        `[Automations] Trigger check [${automation.name}] trigger state ${trigger.state} is true for #${configTrigger.entity}# state is ${to[attribute]}`
+      );
       return true;
     }
     return false;
   }
 
-  private checkCondition(automation: EventAutomation, condition: ConfigCondition): boolean {
+  private checkCondition(
+    automation: EventAutomation,
+    condition: ConfigCondition
+  ): boolean {
     let timeResult = true;
     let eventResult = true;
 
-    if ((condition as ConfigTimeCondition).after || (condition as ConfigTimeCondition).before || (condition as ConfigTimeCondition).between || (condition as ConfigTimeCondition).weekday) {
-      timeResult = this.checkTimeCondition(automation, condition as ConfigTimeCondition);
+    if (
+      (condition as ConfigTimeCondition).after ||
+      (condition as ConfigTimeCondition).before ||
+      (condition as ConfigTimeCondition).between ||
+      (condition as ConfigTimeCondition).weekday
+    ) {
+      timeResult = this.checkTimeCondition(
+        automation,
+        condition as ConfigTimeCondition
+      );
     }
     if ((condition as ConfigEntityCondition).entity) {
-      eventResult = this.checkEntityCondition(automation, condition as ConfigEntityCondition);
+      eventResult = this.checkEntityCondition(
+        automation,
+        condition as ConfigEntityCondition
+      );
     }
-    return (timeResult && eventResult);
+    return timeResult && eventResult;
   }
 
   // Return false if condition is false
-  private checkTimeCondition(automation: EventAutomation, condition: ConfigTimeCondition): boolean {
+  private checkTimeCondition(
+    automation: EventAutomation,
+    condition: ConfigTimeCondition
+  ): boolean {
     //this.logger.info(`[Automations] checkTimeCondition [${automation.name}]: ${this.stringify(condition)}`);
-    const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
     const now = new Date();
     if (condition.weekday && !condition.weekday.includes(days[now.getDay()])) {
-      this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for weekday: ${this.stringify(condition.weekday)} since today is ${days[now.getDay()]}`);
+      this.logger.debug(
+        `[Automations] Condition check [${
+          automation.name
+        }] time condition is false for weekday: ${this.stringify(
+          condition.weekday
+        )} since today is ${days[now.getDay()]}`
+      );
       return false;
     }
     if (condition.before) {
       const time = this.matchTimeString(condition.before);
       if (time !== undefined) {
         if (now.getTime() > time.getTime()) {
-          this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for before: ${condition.before} since now is ${now.toLocaleTimeString()}`);
+          this.logger.debug(
+            `[Automations] Condition check [${
+              automation.name
+            }] time condition is false for before: ${
+              condition.before
+            } since now is ${now.toLocaleTimeString()}`
+          );
           return false;
         }
       } else {
-        this.logger.error(`[Automations] Condition check [${automation.name}] config validation error: before #${condition.before}# ignoring condition`);
+        this.logger.error(
+          `[Automations] Condition check [${automation.name}] config validation error: before #${condition.before}# ignoring condition`
+        );
       }
     }
     if (condition.after) {
       const time = this.matchTimeString(condition.after);
       if (time !== undefined) {
         if (now.getTime() < time.getTime()) {
-          this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for after: ${condition.after} since now is ${now.toLocaleTimeString()}`);
+          this.logger.debug(
+            `[Automations] Condition check [${
+              automation.name
+            }] time condition is false for after: ${
+              condition.after
+            } since now is ${now.toLocaleTimeString()}`
+          );
           return false;
         }
       } else {
-        this.logger.error(`[Automations] Condition check [${automation.name}] config validation error: after #${condition.after}# ignoring condition`);
+        this.logger.error(
+          `[Automations] Condition check [${automation.name}] config validation error: after #${condition.after}# ignoring condition`
+        );
       }
     }
     if (condition.between) {
-      const [startTimeStr, endTimeStr] = condition.between.split('-');
+      const [startTimeStr, endTimeStr] = condition.between.split("-");
       const startTime = this.matchTimeString(startTimeStr);
       const endTime = this.matchTimeString(endTimeStr);
       if (startTime !== undefined && endTime !== undefined) {
-        // Internal time span: between: 08:00:00-20:00:00  
+        // Internal time span: between: 08:00:00-20:00:00
         if (startTime.getTime() < endTime.getTime()) {
-          if (now.getTime() < startTime.getTime() || now.getTime() > endTime.getTime()) {
-            this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for between: ${condition.between} since now is ${now.toLocaleTimeString()}`);
+          if (
+            now.getTime() < startTime.getTime() ||
+            now.getTime() > endTime.getTime()
+          ) {
+            this.logger.debug(
+              `[Automations] Condition check [${
+                automation.name
+              }] time condition is false for between: ${
+                condition.between
+              } since now is ${now.toLocaleTimeString()}`
+            );
             return false;
           }
         }
-        // External time span: between: 20:00:00-06:00:00  
+        // External time span: between: 20:00:00-06:00:00
         else if (startTime.getTime() > endTime.getTime()) {
-          if (now.getTime() < startTime.getTime() && now.getTime() > endTime.getTime()) {
-            this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is false for between: ${condition.between} since now is ${now.toLocaleTimeString()}`);
+          if (
+            now.getTime() < startTime.getTime() &&
+            now.getTime() > endTime.getTime()
+          ) {
+            this.logger.debug(
+              `[Automations] Condition check [${
+                automation.name
+              }] time condition is false for between: ${
+                condition.between
+              } since now is ${now.toLocaleTimeString()}`
+            );
             return false;
           }
         }
       } else {
-        this.logger.error(`[Automations] Condition check [${automation.name}] config validation error: between #${condition.between}# ignoring condition`);
+        this.logger.error(
+          `[Automations] Condition check [${automation.name}] config validation error: between #${condition.between}# ignoring condition`
+        );
       }
     }
-    this.logger.debug(`[Automations] Condition check [${automation.name}] time condition is true for ${this.stringify(condition)}`);
+    this.logger.debug(
+      `[Automations] Condition check [${
+        automation.name
+      }] time condition is true for ${this.stringify(condition)}`
+    );
     return true;
   }
 
   // Return false if condition is false
-  private checkEntityCondition(automation: EventAutomation, condition: ConfigEntityCondition): boolean {
+  private checkEntityCondition(
+    automation: EventAutomation,
+    condition: ConfigEntityCondition
+  ): boolean {
     if (!condition.entity) {
-      this.logger.error(`[Automations] Condition check [${automation.name}] config validation error: condition entity not specified`);
+      this.logger.error(
+        `[Automations] Condition check [${automation.name}] config validation error: condition entity not specified`
+      );
       return false;
     }
     const entity = this.zigbee.resolveEntity(condition.entity);
     if (!entity) {
-      this.logger.error(`[Automations] Condition check [${automation.name}] config validation error: entity #${condition.entity}# not found`);
+      this.logger.error(
+        `[Automations] Condition check [${automation.name}] config validation error: entity #${condition.entity}# not found`
+      );
       return false;
     }
-    const attribute = condition.attribute || 'state';
+    const attribute = condition.attribute || "state";
     const value = this.state.get(entity)[attribute];
     if (condition.state !== undefined && value !== condition.state) {
-      this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not '${condition.state}'`);
+      this.logger.debug(
+        `[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not '${condition.state}'`
+      );
       return false;
     }
-    if (condition.attribute !== undefined && condition.equal !== undefined && value !== condition.equal) {
-      this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not equal '${condition.equal}'`);
+    if (
+      condition.attribute !== undefined &&
+      condition.equal !== undefined &&
+      value !== condition.equal
+    ) {
+      this.logger.debug(
+        `[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not equal '${condition.equal}'`
+      );
       return false;
     }
-    if (condition.attribute !== undefined && condition.below !== undefined && value >= condition.below) {
-      this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not below '${condition.below}'`);
+    if (
+      condition.attribute !== undefined &&
+      condition.below !== undefined &&
+      value >= condition.below
+    ) {
+      this.logger.debug(
+        `[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not below '${condition.below}'`
+      );
       return false;
     }
-    if (condition.attribute !== undefined && condition.above !== undefined && value <= condition.above) {
-      this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not above '${condition.above}'`);
+    if (
+      condition.attribute !== undefined &&
+      condition.above !== undefined &&
+      value <= condition.above
+    ) {
+      this.logger.debug(
+        `[Automations] Condition check [${automation.name}] event condition is false for entity #${condition.entity}# attribute '${attribute}' is '${value}' not above '${condition.above}'`
+      );
       return false;
     }
-    this.logger.debug(`[Automations] Condition check [${automation.name}] event condition is true for entity #${condition.entity}# attribute '${attribute}' is '${value}'`);
+    this.logger.debug(
+      `[Automations] Condition check [${automation.name}] event condition is true for entity #${condition.entity}# attribute '${attribute}' is '${value}'`
+    );
     return true;
   }
 
-  private runActions(automation: EventAutomation, actions: ConfigAction[]): void {
+  private runActions(
+    automation: EventAutomation,
+    actions: ConfigAction[]
+  ): void {
     for (const action of actions) {
+      // Check if action is scene and run it
+      if (action.scene && typeof action.scene === "string") {
+        this.log.warning(`Executing scene: ${action.scene}`);
+        this.runActions(
+          { name: action.scene } as EventAutomation,
+          this.scenes[action.scene] as ConfigAction[]
+        );
+        continue;
+      }
+
+      // Check if action is entity and run it
       const entity = this.zigbee.resolveEntity(action.entity);
       if (!entity) {
-        this.logger.error(`[Automations] Entity #${action.entity}# not found so ignoring this action`);
+        this.logger.error(
+          `[Automations] Entity #${action.entity}# not found so ignoring this action`
+        );
         continue;
       }
       let data: ConfigActionPayload;
       //this.log.warn('Payload:', typeof action.payload, action.payload)
-      if (typeof action.payload === 'string') {
+      if (typeof action.payload === "string") {
         if (action.payload === ConfigPayload.TURN_ON) {
           data = { state: ConfigState.ON };
         } else if (action.payload === ConfigPayload.TURN_OFF) {
@@ -721,24 +1120,49 @@ class AutomationsExtension {
         } else if (action.payload === ConfigPayload.TOGGLE) {
           data = { state: ConfigState.TOGGLE };
         } else {
-          this.logger.error(`[Automations] Run automation [${automation.name}] for entity #${action.entity}# error: payload can be turn_on turn_off toggle or an object`);
+          this.logger.error(
+            `[Automations] Run automation [${automation.name}] for entity #${action.entity}# error: payload can be turn_on turn_off toggle or an object`
+          );
           return;
         }
-      } else if (typeof action.payload === 'object') {
+      } else if (typeof action.payload === "object") {
         data = action.payload;
       } else {
-        this.logger.error(`[Automations] Run automation [${automation.name}] for entity #${action.entity}# error: payload can be turn_on turn_off toggle or an object`);
+        this.logger.error(
+          `[Automations] Run automation [${automation.name}] for entity #${action.entity}# error: payload can be turn_on turn_off toggle or an object`
+        );
         return;
       }
-      if (action.logger === 'info')
-        this.logger.info(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
-      else if (action.logger === 'warning')
-        this.logger.warning(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
-      else if (action.logger === 'error')
-        this.logger.error(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
+      if (action.logger === "info")
+        this.logger.info(
+          `[Automations] Run automation [${
+            automation.name
+          }] send ${this.payloadStringify(data)} to entity #${action.entity}#`
+        );
+      else if (action.logger === "warning")
+        this.logger.warning(
+          `[Automations] Run automation [${
+            automation.name
+          }] send ${this.payloadStringify(data)} to entity #${action.entity}#`
+        );
+      else if (action.logger === "error")
+        this.logger.error(
+          `[Automations] Run automation [${
+            automation.name
+          }] send ${this.payloadStringify(data)} to entity #${action.entity}#`
+        );
       else
-        this.logger.debug(`[Automations] Run automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}#`);
-      this.mqtt.onMessage(`${this.mqttBaseTopic}/${entity.name}/set`, Buffer.from(this.payloadStringify(data)));
+        this.logger.debug(
+          `[Automations] Run automation [${
+            automation.name
+          }] send ${this.payloadStringify(data)} to entity #${action.entity}#`
+        );
+      // this.mqtt.onMessage(`${this.mqttBaseTopic}/${entity.name}/set`, Buffer.from(this.payloadStringify(data)));
+      // This is even faster cause we skip one passage.
+      this.eventBus.emitMQTTMessage({
+        topic: `${this.mqttBaseTopic}/${entity.name}/set`,
+        message: this.payloadStringify(data),
+      });
       if (action.turn_off_after) {
         this.startActionTurnOffTimeout(automation, action);
       }
@@ -754,69 +1178,106 @@ class AutomationsExtension {
     //this.log.warning(`Uregistering automation [${name}]`);
     Object.keys(this.eventAutomations).forEach((entity) => {
       //this.log.warning(`Entity: #${entity}#`);
-      Object.values(this.eventAutomations[entity]).forEach((eventAutomation, index) => {
-        if (eventAutomation.name === name) {
-          //this.log.warning(`Entity: #${entity}# ${index} event automation: ${eventAutomation.name}`);
-          this.eventAutomations[entity].splice(index, 1);
+      Object.values(this.eventAutomations[entity]).forEach(
+        (eventAutomation, index) => {
+          if (eventAutomation.name === name) {
+            //this.log.warning(`Entity: #${entity}# ${index} event automation: ${eventAutomation.name}`);
+            this.eventAutomations[entity].splice(index, 1);
+          } else {
+            //this.log.info(`Entity: #${entity}# ${index} event automation: ${eventAutomation.name}`);
+          }
         }
-        else {
-          //this.log.info(`Entity: #${entity}# ${index} event automation: ${eventAutomation.name}`);
-        }
-      });
+      );
     });
     Object.keys(this.timeAutomations).forEach((now) => {
       //this.log.warning(`Time: #${now}#`);
-      Object.values(this.timeAutomations[now]).forEach((timeAutomation, index) => {
-        if (timeAutomation.name === name) {
-          //this.log.warning(`Time: #${now}# ${index} time automation: ${timeAutomation.name}`);
-          this.timeAutomations[now].splice(index, 1);
+      Object.values(this.timeAutomations[now]).forEach(
+        (timeAutomation, index) => {
+          if (timeAutomation.name === name) {
+            //this.log.warning(`Time: #${now}# ${index} time automation: ${timeAutomation.name}`);
+            this.timeAutomations[now].splice(index, 1);
+          } else {
+            //this.log.info(`Time: #${now}# ${index} time automation: ${timeAutomation.name}`);
+          }
         }
-        else {
-          //this.log.info(`Time: #${now}# ${index} time automation: ${timeAutomation.name}`);
-        }
-      });
+      );
     });
   }
 
   // Stop the turn_off_after timeout
-  private stopActionTurnOffTimeout(automation: EventAutomation, action: ConfigAction): void {
+  private stopActionTurnOffTimeout(
+    automation: EventAutomation,
+    action: ConfigAction
+  ): void {
     const timeout = this.turnOffAfterTimeouts[automation.name + action.entity];
     if (timeout) {
-      this.logger.debug(`[Automations] Stop turn_off_after timeout for automation [${automation.name}]`);
+      this.logger.debug(
+        `[Automations] Stop turn_off_after timeout for automation [${automation.name}]`
+      );
       clearTimeout(timeout);
       delete this.turnOffAfterTimeouts[automation.name + action.entity];
     }
   }
 
   // Start the turn_off_after timeout
-  private startActionTurnOffTimeout(automation: EventAutomation, action: ConfigAction): void {
+  private startActionTurnOffTimeout(
+    automation: EventAutomation,
+    action: ConfigAction
+  ): void {
     this.stopActionTurnOffTimeout(automation, action);
-    this.logger.debug(`[Automations] Start ${action.turn_off_after} seconds turn_off_after timeout for automation [${automation.name}]`);
+    this.logger.debug(
+      `[Automations] Start ${action.turn_off_after} seconds turn_off_after timeout for automation [${automation.name}]`
+    );
     const timeout = setTimeout(() => {
       delete this.turnOffAfterTimeouts[automation.name + action.entity];
       //this.logger.debug(`[Automations] Turn_off_after timeout for automation [${automation.name}]`);
       const entity = this.zigbee.resolveEntity(action.entity);
       if (!entity) {
-        this.logger.error(`[Automations] Entity #${action.entity}# not found so ignoring this action`);
+        this.logger.error(
+          `[Automations] Entity #${action.entity}# not found so ignoring this action`
+        );
         this.stopActionTurnOffTimeout(automation, action);
         return;
       }
       const data = action.payload_off ?? { state: ConfigState.OFF };
-      if (action.logger === 'info')
-        this.logger.info(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
-      else if (action.logger === 'warning')
-        this.logger.warning(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
-      else if (action.logger === 'error')
-        this.logger.error(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
+      if (action.logger === "info")
+        this.logger.info(
+          `[Automations] Turn_off_after timeout for automation [${
+            automation.name
+          }] send ${this.payloadStringify(data)} to entity #${action.entity}# `
+        );
+      else if (action.logger === "warning")
+        this.logger.warning(
+          `[Automations] Turn_off_after timeout for automation [${
+            automation.name
+          }] send ${this.payloadStringify(data)} to entity #${action.entity}# `
+        );
+      else if (action.logger === "error")
+        this.logger.error(
+          `[Automations] Turn_off_after timeout for automation [${
+            automation.name
+          }] send ${this.payloadStringify(data)} to entity #${action.entity}# `
+        );
       else
-        this.logger.debug(`[Automations] Turn_off_after timeout for automation [${automation.name}] send ${this.payloadStringify(data)} to entity #${action.entity}# `);
-      this.mqtt.onMessage(`${this.mqttBaseTopic}/${entity.name}/set`, Buffer.from(this.payloadStringify(data)));
+        this.logger.debug(
+          `[Automations] Turn_off_after timeout for automation [${
+            automation.name
+          }] send ${this.payloadStringify(data)} to entity #${action.entity}# `
+        );
+      this.mqtt.onMessage(
+        `${this.mqttBaseTopic}/${entity.name}/set`,
+        Buffer.from(this.payloadStringify(data))
+      );
     }, action.turn_off_after! * 1000);
     timeout.unref();
     this.turnOffAfterTimeouts[automation.name + action.entity] = timeout;
   }
 
-  private runActionsWithConditions(automation: EventAutomation, conditions: ConfigCondition[], actions: ConfigAction[]): void {
+  private runActionsWithConditions(
+    automation: EventAutomation,
+    conditions: ConfigCondition[],
+    actions: ConfigAction[]
+  ): void {
     for (const condition of conditions) {
       //this.log.warning(`runActionsWithConditions: conditon: ${this.stringify(condition)}`);
       if (!this.checkCondition(automation, condition)) {
@@ -831,7 +1292,9 @@ class AutomationsExtension {
     const timeout = this.triggerForTimeouts[automation.name];
     if (timeout) {
       //this.log.debug(`Stop timeout for automation [${automation.name}] trigger: ${this.stringify(automation.trigger)}`);
-      this.logger.debug(`[Automations] Stop trigger-for timeout for automation [${automation.name}]`);
+      this.logger.debug(
+        `[Automations] Stop trigger-for timeout for automation [${automation.name}]`
+      );
       clearTimeout(timeout);
       delete this.triggerForTimeouts[automation.name];
     }
@@ -840,21 +1303,42 @@ class AutomationsExtension {
   // Start the trigger_for timeout
   private startTriggerForTimeout(automation: EventAutomation): void {
     if (automation.trigger.for === undefined || automation.trigger.for === 0) {
-      this.logger.error(`[Automations] Start ${automation.trigger.for} seconds trigger-for timeout error for automation [${automation.name}]`);
+      this.logger.error(
+        `[Automations] Start ${automation.trigger.for} seconds trigger-for timeout error for automation [${automation.name}]`
+      );
       return;
     }
-    this.logger.debug(`[Automations] Start ${automation.trigger.for} seconds trigger-for timeout for automation [${automation.name}]`);
+    this.logger.debug(
+      `[Automations] Start ${automation.trigger.for} seconds trigger-for timeout for automation [${automation.name}]`
+    );
     const timeout = setTimeout(() => {
       delete this.triggerForTimeouts[automation.name];
-      this.logger.debug(`[Automations] Trigger-for timeout for automation [${automation.name}]`);
-      this.runActionsWithConditions(automation, automation.condition, automation.action);
+      this.logger.debug(
+        `[Automations] Trigger-for timeout for automation [${automation.name}]`
+      );
+      this.runActionsWithConditions(
+        automation,
+        automation.condition,
+        automation.action
+      );
     }, automation.trigger.for * 1000);
     timeout.unref();
     this.triggerForTimeouts[automation.name] = timeout;
   }
 
-  private runAutomationIfMatches(automation: EventAutomation, update: StateChangeUpdate, from: StateChangeFrom, to: StateChangeTo): void {
-    const triggerResult = this.checkTrigger(automation, automation.trigger, update, from, to);
+  private runAutomationIfMatches(
+    automation: EventAutomation,
+    update: StateChangeUpdate,
+    from: StateChangeFrom,
+    to: StateChangeTo
+  ): void {
+    const triggerResult = this.checkTrigger(
+      automation,
+      automation.trigger,
+      update,
+      from,
+      to
+    );
     if (triggerResult === false) {
       this.stopTriggerForTimeout(automation);
       return;
@@ -864,7 +1348,9 @@ class AutomationsExtension {
     }
     const timeout = this.triggerForTimeouts[automation.name];
     if (timeout) {
-      this.logger.debug(`[Automations] Waiting trigger-for timeout for automation [${automation.name}]`);
+      this.logger.debug(
+        `[Automations] Waiting trigger-for timeout for automation [${automation.name}]`
+      );
       return;
     } else {
       this.logger.debug(`[Automations] Start automation [${automation.name}]`);
@@ -873,10 +1359,19 @@ class AutomationsExtension {
       this.startTriggerForTimeout(automation);
       return;
     }
-    this.runActionsWithConditions(automation, automation.condition, automation.action);
+    this.runActionsWithConditions(
+      automation,
+      automation.condition,
+      automation.action
+    );
   }
 
-  private findAndRun(entityId: EntityId, update: StateChangeUpdate, from: StateChangeFrom, to: StateChangeTo): void {
+  private findAndRun(
+    entityId: EntityId,
+    update: StateChangeUpdate,
+    from: StateChangeFrom,
+    to: StateChangeTo
+  ): void {
     const automations = this.eventAutomations[entityId];
     if (!automations) {
       return;
@@ -886,21 +1381,28 @@ class AutomationsExtension {
     }
   }
 
-  private processMessage(message: MQTTMessage)
-  {
-    const match = message.topic.match(this.topicRegex);
+  // Process MQTT messages private message for automations.
+  // Publish: topic "zigbee2mqtt-automations/<automation_name>" with raw message "execute"
+  // Publish: topic "zigbee2mqtt-scenes/<scene_name>" with raw message "execute"
+  private processMessage(message: MQTTMessage) {
+    const automationsMatch = message.topic.match(this.automationsTopicRegex);
 
-    if (match) {
-
+    if (automationsMatch) {
       for (const automations of Object.values(this.eventAutomations)) {
-
         for (const automation of automations) {
+          if (automation.name == automationsMatch[1]) {
+            this.logger.info(
+              `[Automations] MQTT message for [${automationsMatch[1]}]: "${message.message}"`
+            );
 
-          if (automation.name == match[1]) {
-            this.logger.info(`[Automations] MQTT message for [${match[1]}]: ${message.message}`);
-
-            switch (message.message) {
+            switch (message.message.trim()) {
               case MessagePayload.EXECUTE:
+                this.log.warning(
+                  `Executing automation "${automation.name}": ${this.stringify(
+                    automation.action,
+                    true
+                  )}`
+                );
                 this.runActions(automation, automation.action);
                 break;
             }
@@ -909,6 +1411,33 @@ class AutomationsExtension {
           }
         }
       }
+    }
+
+    const scenesMatch = message.topic.match(this.scenesTopicRegex);
+
+    if (scenesMatch) {
+      Object.entries(this.scenes).forEach(([key]) => {
+        if (key == scenesMatch[1]) {
+          this.logger.info(
+            `[Scenes] MQTT message for [${scenesMatch[1]}]: "${message.message}"`
+          );
+
+          switch (message.message.trim()) {
+            case MessagePayload.EXECUTE:
+              this.log.warning(
+                `Executing scene "${key}": ${this.stringify(
+                  this.scenes[key],
+                  true
+                )}`
+              );
+              this.runActions(
+                { name: key } as EventAutomation,
+                this.scenes[key] as ConfigAction[]
+              );
+              break;
+          }
+        }
+      });
     }
   }
 
@@ -919,11 +1448,11 @@ class AutomationsExtension {
     });
 
     this.mqtt.subscribe(`${this.automationsTopic}/+`);
+    this.mqtt.subscribe(`${this.scenesTopic}/+`);
 
     this.eventBus.onMQTTMessage(this, (data: MQTTMessage) => {
       this.processMessage(data);
     });
-
   }
 
   async stop() {
@@ -946,46 +1475,72 @@ class AutomationsExtension {
   }
 
   private payloadStringify(payload: object): string {
-    return this.stringify(payload, false, 255, 255, 35, 220, 159, 1, '"', '"')
+    return this.stringify(payload, false, 255, 255, 35, 220, 159, 1, '"', '"');
   }
 
-  private stringify(payload: object, enableColors = false, colorPayload = 255, colorKey = 255, colorString = 35, colorNumber = 220, colorBoolean = 159, colorUndefined = 1, keyQuote = '', stringQuote = '\''): string {
+  private stringify(
+    payload: object,
+    enableColors = false,
+    colorPayload = 255,
+    colorKey = 255,
+    colorString = 35,
+    colorNumber = 220,
+    colorBoolean = 159,
+    colorUndefined = 1,
+    keyQuote = "",
+    stringQuote = "'"
+  ): string {
     const clr = (color: number) => {
-      return enableColors ? `\x1b[38;5;${color}m` : '';
+      return enableColors ? `\x1b[38;5;${color}m` : "";
     };
     const reset = () => {
-      return enableColors ? `\x1b[0m` : '';
+      return enableColors ? `\x1b[0m` : "";
     };
     const isArray = Array.isArray(payload);
-    let string = `${reset()}${clr(colorPayload)}` + (isArray ? '[ ' : '{ ');
+    let string = `${reset()}${clr(colorPayload)}` + (isArray ? "[ " : "{ ");
     Object.entries(payload).forEach(([key, value], index) => {
       if (index > 0) {
-        string += ', ';
+        string += ", ";
       }
-      let newValue = '';
+      let newValue = "";
       newValue = value;
-      if (typeof newValue === 'string') {
-        newValue = `${clr(colorString)}${stringQuote}${newValue}${stringQuote}${reset()}`;
+      if (typeof newValue === "string") {
+        newValue = `${clr(
+          colorString
+        )}${stringQuote}${newValue}${stringQuote}${reset()}`;
       }
-      if (typeof newValue === 'number') {
+      if (typeof newValue === "number") {
         newValue = `${clr(colorNumber)}${newValue}${reset()}`;
       }
-      if (typeof newValue === 'boolean') {
+      if (typeof newValue === "boolean") {
         newValue = `${clr(colorBoolean)}${newValue}${reset()}`;
       }
-      if (typeof newValue === 'undefined') {
+      if (typeof newValue === "undefined") {
         newValue = `${clr(colorUndefined)}undefined${reset()}`;
       }
-      if (typeof newValue === 'object') {
-        newValue = this.stringify(newValue, enableColors, colorPayload, colorKey, colorString, colorNumber, colorBoolean, colorUndefined, keyQuote, stringQuote);
+      if (typeof newValue === "object") {
+        newValue = this.stringify(
+          newValue,
+          enableColors,
+          colorPayload,
+          colorKey,
+          colorString,
+          colorNumber,
+          colorBoolean,
+          colorUndefined,
+          keyQuote,
+          stringQuote
+        );
       }
       // new
-      if (isArray)
-        string += `${newValue}`;
+      if (isArray) string += `${newValue}`;
       else
-        string += `${clr(colorKey)}${keyQuote}${key}${keyQuote}${reset()}: ${newValue}`;
+        string += `${clr(
+          colorKey
+        )}${keyQuote}${key}${keyQuote}${reset()}: ${newValue}`;
     });
-    return string += ` ${clr(colorPayload)}` + (isArray ? ']' : '}') + `${reset()}`;
+    return (string +=
+      ` ${clr(colorPayload)}` + (isArray ? "]" : "}") + `${reset()}`);
   }
 }
 
@@ -1013,19 +1568,36 @@ const PI = Math.PI,
 const dayMs = 1000 * 60 * 60 * 24,
   J1970 = 2440588,
   J2000 = 2451545;
-function toJulian(date) { return date.valueOf() / dayMs - 0.5 + J1970; }
-function fromJulian(j) { return new Date((j + 0.5 - J1970) * dayMs); }
-function toDays(date) { return toJulian(date) - J2000; }
+function toJulian(date) {
+  return date.valueOf() / dayMs - 0.5 + J1970;
+}
+function fromJulian(j) {
+  return new Date((j + 0.5 - J1970) * dayMs);
+}
+function toDays(date) {
+  return toJulian(date) - J2000;
+}
 
 // general calculations for position
 const e = rad * 23.4397; // obliquity of the Earth
-function rightAscension(l, b) { return atan(sin(l) * cos(e) - tan(b) * sin(e), cos(l)); }
-function declination(l, b) { return asin(sin(b) * cos(e) + cos(b) * sin(e) * sin(l)); }
-function azimuth(H, phi, dec) { return atan(sin(H), cos(H) * sin(phi) - tan(dec) * cos(phi)); }
-function altitude(H, phi, dec) { return asin(sin(phi) * sin(dec) + cos(phi) * cos(dec) * cos(H)); }
-function siderealTime(d, lw) { return rad * (280.16 + 360.9856235 * d) - lw; }
+function rightAscension(l, b) {
+  return atan(sin(l) * cos(e) - tan(b) * sin(e), cos(l));
+}
+function declination(l, b) {
+  return asin(sin(b) * cos(e) + cos(b) * sin(e) * sin(l));
+}
+function azimuth(H, phi, dec) {
+  return atan(sin(H), cos(H) * sin(phi) - tan(dec) * cos(phi));
+}
+function altitude(H, phi, dec) {
+  return asin(sin(phi) * sin(dec) + cos(phi) * cos(dec) * cos(H));
+}
+function siderealTime(d, lw) {
+  return rad * (280.16 + 360.9856235 * d) - lw;
+}
 function astroRefraction(h) {
-  if (h < 0) // the following formula works for positive altitudes only.
+  if (h < 0)
+    // the following formula works for positive altitudes only.
     h = 0; // if h = -0.08901179 a div/0 would occur.
   // formula 16.4 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
   // 1.02 / tan(h + 10.26 / (h + 5.10)) h in degrees, result in arc minutes -> converted to rad:
@@ -1033,7 +1605,9 @@ function astroRefraction(h) {
 }
 
 // general sun calculations
-function solarMeanAnomaly(d) { return rad * (357.5291 + 0.98560028 * d); }
+function solarMeanAnomaly(d) {
+  return rad * (357.5291 + 0.98560028 * d);
+}
 function eclipticLongitude(M) {
   const C = rad * (1.9148 * sin(M) + 0.02 * sin(2 * M) + 0.0003 * sin(3 * M)), // equation of center
     P = rad * 102.9372; // perihelion of the Earth
@@ -1045,17 +1619,27 @@ function sunCoords(d) {
     L = eclipticLongitude(M);
   return {
     dec: declination(L, 0),
-    ra: rightAscension(L, 0)
+    ra: rightAscension(L, 0),
   };
 }
 
 // calculations for sun times
 const J0 = 0.0009;
-function julianCycle(d, lw) { return Math.round(d - J0 - lw / (2 * PI)); }
-function approxTransit(Ht, lw, n) { return J0 + (Ht + lw) / (2 * PI) + n; }
-function solarTransitJ(ds, M, L) { return J2000 + ds + 0.0053 * sin(M) - 0.0069 * sin(2 * L); }
-function hourAngle(h, phi, d) { return acos((sin(h) - sin(phi) * sin(d)) / (cos(phi) * cos(d))); }
-function observerAngle(height) { return -2.076 * Math.sqrt(height) / 60; }
+function julianCycle(d, lw) {
+  return Math.round(d - J0 - lw / (2 * PI));
+}
+function approxTransit(Ht, lw, n) {
+  return J0 + (Ht + lw) / (2 * PI) + n;
+}
+function solarTransitJ(ds, M, L) {
+  return J2000 + ds + 0.0053 * sin(M) - 0.0069 * sin(2 * L);
+}
+function hourAngle(h, phi, d) {
+  return acos((sin(h) - sin(phi) * sin(d)) / (cos(phi) * cos(d)));
+}
+function observerAngle(height) {
+  return (-2.076 * Math.sqrt(height)) / 60;
+}
 // returns set time for the given sun altitude
 function getSetJ(h, lw, phi, dec, n, M, L) {
   const w = hourAngle(h, phi, dec),
@@ -1064,52 +1648,50 @@ function getSetJ(h, lw, phi, dec, n, M, L) {
 }
 
 // moon calculations, based on http://aa.quae.nl/en/reken/hemelpositie.html formulas
-function moonCoords(d) { // geocentric ecliptic coordinates of the moon
+function moonCoords(d) {
+  // geocentric ecliptic coordinates of the moon
   const L = rad * (218.316 + 13.176396 * d), // ecliptic longitude
     M = rad * (134.963 + 13.064993 * d), // mean anomaly
-    F = rad * (93.272 + 13.229350 * d),  // mean distance
-
+    F = rad * (93.272 + 13.22935 * d), // mean distance
     l = L + rad * 6.289 * sin(M), // longitude
-    b = rad * 5.128 * sin(F),     // latitude
-    dt = 385001 - 20905 * cos(M);  // distance to the moon in km
+    b = rad * 5.128 * sin(F), // latitude
+    dt = 385001 - 20905 * cos(M); // distance to the moon in km
 
   return {
     ra: rightAscension(l, b),
     dec: declination(l, b),
-    dist: dt
+    dist: dt,
   };
 }
 
 function hoursLater(date, h) {
-  return new Date(date.valueOf() + h * dayMs / 24);
+  return new Date(date.valueOf() + (h * dayMs) / 24);
 }
 
 class SunCalc {
   // calculates sun position for a given date and latitude/longitude
   // @ts-ignore: Unused method
   private getPosition(date, lat, lng) {
-
     const lw = rad * -lng,
       phi = rad * lat,
       d = toDays(date),
-
       c = sunCoords(d),
       H = siderealTime(d, lw) - c.ra;
 
     return {
       azimuth: azimuth(H, phi, c.dec),
-      altitude: altitude(H, phi, c.dec)
+      altitude: altitude(H, phi, c.dec),
     };
   }
 
   // sun times configuration (angle, morning name, evening name)
   private times = [
-    [-0.833, 'sunrise', 'sunset'],
-    [-0.3, 'sunriseEnd', 'sunsetStart'],
-    [-6, 'dawn', 'dusk'],
-    [-12, 'nauticalDawn', 'nauticalDusk'],
-    [-18, 'nightEnd', 'night'],
-    [6, 'goldenHourEnd', 'goldenHour']
+    [-0.833, "sunrise", "sunset"],
+    [-0.3, "sunriseEnd", "sunsetStart"],
+    [-6, "dawn", "dusk"],
+    [-12, "nauticalDawn", "nauticalDusk"],
+    [-18, "nightEnd", "night"],
+    [6, "goldenHourEnd", "goldenHour"],
   ];
 
   // adds a custom time to the times config
@@ -1136,7 +1718,7 @@ class SunCalc {
     let i, len, time, h0, Jset, Jrise;
     const result = {
       solarNoon: fromJulian(Jnoon),
-      nadir: fromJulian(Jnoon - 0.5)
+      nadir: fromJulian(Jnoon - 0.5),
     };
 
     for (i = 0, len = this.times.length; i < len; i += 1) {
@@ -1166,7 +1748,7 @@ class SunCalc {
       azimuth: azimuth(H, phi, c.dec),
       altitude: h,
       distance: c.dist,
-      parallacticAngle: pa
+      parallacticAngle: pa,
     };
   }
 
@@ -1179,15 +1761,19 @@ class SunCalc {
       s = sunCoords(d),
       m = moonCoords(d),
       sdist = 149598000, // distance from Earth to Sun in km
-      phi = acos(sin(s.dec) * sin(m.dec) + cos(s.dec) * cos(m.dec) * cos(s.ra - m.ra)),
+      phi = acos(
+        sin(s.dec) * sin(m.dec) + cos(s.dec) * cos(m.dec) * cos(s.ra - m.ra)
+      ),
       inc = atan(sdist * sin(phi), m.dist - sdist * cos(phi)),
-      angle = atan(cos(s.dec) * sin(s.ra - m.ra), sin(s.dec) * cos(m.dec) -
-        cos(s.dec) * sin(m.dec) * cos(s.ra - m.ra));
+      angle = atan(
+        cos(s.dec) * sin(s.ra - m.ra),
+        sin(s.dec) * cos(m.dec) - cos(s.dec) * sin(m.dec) * cos(s.ra - m.ra)
+      );
 
     return {
       fraction: (1 + cos(inc)) / 2,
-      phase: 0.5 + 0.5 * inc * (angle < 0 ? -1 : 1) / Math.PI,
-      angle: angle
+      phase: 0.5 + (0.5 * inc * (angle < 0 ? -1 : 1)) / Math.PI,
+      angle: angle,
     };
   }
 
@@ -1223,7 +1809,6 @@ class SunCalc {
       if (roots === 1) {
         if (h0 < 0) rise = i + x1;
         else set = i + x1;
-
       } else if (roots === 2) {
         rise = i + (ye < 0 ? x2 : x1);
         set = i + (ye < 0 ? x1 : x2);
@@ -1239,11 +1824,10 @@ class SunCalc {
     if (rise) result[rise] = hoursLater(t, rise);
     if (set) result[set] = hoursLater(t, set);
 
-    if (!rise && !set) result[ye > 0 ? 'alwaysUp' : 'alwaysDown'] = true;
+    if (!rise && !set) result[ye > 0 ? "alwaysUp" : "alwaysDown"] = true;
 
     return result;
   }
-
 }
 
 export = AutomationsExtension;
