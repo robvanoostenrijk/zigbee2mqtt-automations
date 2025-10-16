@@ -47,7 +47,7 @@ A scene consists of one or more actions (scenes can be nested).
 
 ### Method 1
 
-Download the file dist\automation.js and place it in the zigbee2mqtt\data\extension directory (create the directory if it doesn't exist).
+Download the file dist\automation.js and place it in the zigbee2mqtt\data\external_extensions directory (create the directory if it doesn't exist).
 Stop zigbee2mqtt, ensure it has completely stoppped, and then start it again. This method ensures all extensions are loaded.
 
 ### Method 2
